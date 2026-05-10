@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class TrendTopic(BaseModel):
@@ -26,7 +26,7 @@ class ResearchResult(BaseModel):
     hooks: list[HookOption]
     winning_hook: str
     selection_rationale: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ScriptSection(BaseModel):
@@ -90,7 +90,7 @@ class AffiliateInsertion(BaseModel):
 
 class VideoPackage(BaseModel):
     video_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     niche: str
     research: ResearchResult
     script: Script
