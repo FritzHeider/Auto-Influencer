@@ -2,6 +2,7 @@ import uuid
 import json
 import asyncio
 import logging
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -51,27 +52,37 @@ async def run_pipeline(
     logger.info(f"Niche: {niche} | Tone: {tone} | Demo: {demographic}")
     logger.info(f"=" * 60)
 
+    timings: dict[str, float] = {}
+
     # Stage 1: Research + hooks
     logger.info("Stage 1/5: Research + trend analysis")
+    t0 = time.monotonic()
     research = await run_research(niche, tone, demographic)
+    timings["research"] = round(time.monotonic() - t0, 2)
 
     # Stage 2: Script generation
     logger.info("Stage 2/5: Script generation")
+    t0 = time.monotonic()
     script = await generate_script(research, niche, tone, demographic)
+    timings["script"] = round(time.monotonic() - t0, 2)
 
     # Stage 3: SEO + Affiliates (run in parallel)
     logger.info("Stage 3/5: SEO + affiliate generation (parallel)")
+    t0 = time.monotonic()
     seo, affiliates = await asyncio.gather(
         generate_seo_package(script, niche, demographic),
         generate_affiliate_insertions(script, niche),
     )
+    timings["seo_affiliates"] = round(time.monotonic() - t0, 2)
 
     # Stage 4: Voice generation
     voice_spec = None
     audio_path = None
     if not skip_voice:
         logger.info("Stage 4/5: Voice generation (OpenAI TTS → ElevenLabs fallback)")
+        t0 = time.monotonic()
         voice_spec, audio_path = await generate_voiceover(script, niche, tone, demographic, video_id)
+        timings["voice"] = round(time.monotonic() - t0, 2)
     else:
         logger.info("Stage 4/5: Skipped (skip_voice=True)")
         from pipeline.models import VoiceSpec
@@ -87,9 +98,11 @@ async def run_pipeline(
     thumbnail_path = None
     if not skip_thumbnail:
         logger.info("Stage 5/5: Thumbnail generation (fal.ai Flux)")
+        t0 = time.monotonic()
         thumbnail_concepts, winning_thumbnail, thumbnail_path = await generate_thumbnail(
             script, seo, niche, video_id
         )
+        timings["thumbnail"] = round(time.monotonic() - t0, 2)
     else:
         logger.info("Stage 5/5: Skipped (skip_thumbnail=True)")
         from pipeline.models import ThumbnailConcept
@@ -100,7 +113,7 @@ async def run_pipeline(
             text_overlay="placeholder",
             accent_elements=[],
             color_mood="neutral",
-            fireworks_prompt="placeholder",
+            image_prompt="placeholder",
             ctr_score=0.0,
             is_winner=True,
         )
@@ -120,6 +133,7 @@ async def run_pipeline(
         audio_path=audio_path,
         thumbnail_path=thumbnail_path,
         status="ready",
+        stage_timings=timings,
     )
 
     # Save package JSON
@@ -135,6 +149,7 @@ async def run_pipeline(
     logger.info(f"Title: {seo.title}")
     logger.info(f"Audio: {audio_path or 'skipped'}")
     logger.info(f"Thumbnail: {thumbnail_path or 'skipped'}")
+    logger.info(f"Timings: { {k: f'{v}s' for k, v in timings.items()} }")
     logger.info(f"Package saved: {package_path}")
     logger.info(f"=" * 60)
 
@@ -142,18 +157,19 @@ async def run_pipeline(
 
 
 async def run_batch(count: int = 3, **kwargs) -> list[VideoPackage]:
-    """Run pipeline N times for batch content production."""
-    logger.info(f"Starting batch run: {count} videos")
-    packages = []
-    for i in range(count):
-        logger.info(f"Batch video {i+1}/{count}")
+    """Run pipeline N times in parallel for batch content production."""
+    logger.info(f"Starting batch run: {count} videos (parallel)")
+
+    async def _run_one(index: int) -> VideoPackage | None:
+        logger.info(f"Batch video {index + 1}/{count} starting")
         try:
-            pkg = await run_pipeline(**kwargs)
-            packages.append(pkg)
-            if i < count - 1:
-                await asyncio.sleep(5)  # Brief pause between runs
+            return await run_pipeline(**kwargs)
         except Exception as e:
-            logger.error(f"Batch video {i+1} failed: {e}")
+            logger.error(f"Batch video {index + 1} failed: {e}")
+            return None
+
+    results = await asyncio.gather(*[_run_one(i) for i in range(count)])
+    packages = [r for r in results if r is not None]
     logger.info(f"Batch complete: {len(packages)}/{count} successful")
     return packages
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -85,15 +86,21 @@ async def generate_thumbnail(
     niche: str,
     video_id: str,
 ) -> tuple[list[ThumbnailConcept], ThumbnailConcept, str | None]:
-    """Full thumbnail pipeline: concept generation + rendering."""
+    """Full thumbnail pipeline: concept generation + rendering all concepts in parallel."""
     thumbnail_dir = Path(settings.thumbnail_dir)
     thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
     concepts = await generate_thumbnail_concepts(script, seo, niche)
+
+    paths = [thumbnail_dir / f"{video_id}_thumbnail_{c.concept_id}.jpg" for c in concepts]
+    results = await asyncio.gather(*[
+        render_thumbnail_fal(concept, path)
+        for concept, path in zip(concepts, paths)
+    ])
+
+    for concept, path, ok in zip(concepts, paths, results):
+        if ok:
+            concept.rendered_path = str(path)
+
     winner = next((c for c in concepts if c.is_winner), concepts[0])
-
-    output_path = thumbnail_dir / f"{video_id}_thumbnail.jpg"
-    success = await render_thumbnail_fal(winner, output_path)
-
-    thumbnail_path = str(output_path) if success else None
-    return concepts, winner, thumbnail_path
+    return concepts, winner, winner.rendered_path

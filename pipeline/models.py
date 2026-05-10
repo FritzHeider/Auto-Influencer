@@ -76,6 +76,7 @@ class ThumbnailConcept(BaseModel):
     image_prompt: str
     ctr_score: float
     is_winner: bool = False
+    rendered_path: Optional[str] = None
 
 
 class SEOPackage(BaseModel):
@@ -94,6 +95,7 @@ class AffiliateInsertion(BaseModel):
 
 
 class VideoPackage(BaseModel):
+    schema_version: str = "2"
     video_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     niche: str
@@ -107,6 +109,7 @@ class VideoPackage(BaseModel):
     audio_path: Optional[str] = None
     thumbnail_path: Optional[str] = None
     status: str = "pending"
+    stage_timings: dict[str, float] = Field(default_factory=dict)
 
 
 class ChannelMetrics(BaseModel):

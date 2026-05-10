@@ -6,19 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Fully automated faceless YouTube/TikTok content engine. One `run_pipeline()` call produces a complete video package: researched topic, scripted content, voiceover audio, SEO metadata, affiliate insertions, and thumbnail image — saved as a JSON package in `./output/`.
 
-## Package structure (expected vs current)
-
-**The source imports assume a subdirectory package layout that does not yet exist on disk.** All `*.py` files currently sit flat at the repo root, but the imports reference:
+## Package structure
 
 ```
-config/settings.py       ← settings.py (root)
-pipeline/models.py       ← models.py (root)
-pipeline/stage*.py       ← stage*.py (root)
-prompts/system_prompts.py ← system_prompts.py (root)
-main.py, api.py, test_pipeline.py  ← root (correct)
+config/settings.py        pydantic-settings BaseSettings; singleton `settings` imported directly
+pipeline/models.py        all Pydantic models
+pipeline/stage*.py        one file per pipeline stage
+prompts/system_prompts.py all LLM prompt templates
+main.py                   CLI entry point + run_pipeline() / run_batch()
+api.py                    FastAPI server
+test_pipeline.py          pytest suite
 ```
-
-Before running anything, you must either reorganize files into the expected subdirectories and add `__init__.py` files, or update all imports to point to the flat root layout.
 
 ## Running the pipeline
 
@@ -51,10 +49,9 @@ Tests use `pytest-asyncio` for async stages. All external calls (Bing, Groq, Ope
 
 ## Environment
 
-Python 3.14 (`venv/`). No `requirements.txt` exists yet — dependencies must be installed manually. Key packages needed: `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `openai`, `groq`, `httpx`, `elevenlabs`, `pyht`, `pytest`, `pytest-asyncio`.
+Python 3.14 (`venv/`). Install with `pip install -r requirements.txt`.
 
-Required `.env` keys (see `settings.py` for field names):
-`OPENAI_API_KEY`, `ELEVEN_LABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `PLAYHT_API_KEY`, `PLAYHT_USER_ID`, `FIREWORK_API_KEY`, `BING_API_KEY`, `GROQ_API_KEY`. Optional: `N8N_WEBHOOK_URL`, `N8N_API_KEY`, `CHANNEL_NICHE`, `CHANNEL_TONE`, `CHANNEL_DEMOGRAPHIC`.
+Required `.env` keys: `OPENAI_API_KEY`, `GROQ_API_KEY`, `FAL_KEY`. Optional: `ELEVEN_API_KEY` (ElevenLabs TTS fallback), `N8N_WEBHOOK_URL`, `N8N_API_KEY`, `CHANNEL_NICHE`, `CHANNEL_TONE`, `CHANNEL_DEMOGRAPHIC`. See `.env.example` for the full list. Settings uses `extra="ignore"` so unrelated keys in a shared `.env` are safe.
 
 ## Architecture
 
@@ -62,11 +59,11 @@ Required `.env` keys (see `settings.py` for field names):
 
 | Stage | File | Provider | Notes |
 |-------|------|----------|-------|
-| Research + hooks | `stage1_research.py` | Bing → Groq (OpenAI fallback) | Groq used for speed; falls back to GPT-4o on error |
+| Research + hooks | `stage1_research.py` | DuckDuckGo → Groq (OpenAI fallback) | DDG queries run in parallel; Groq llama-3.3-70b for speed, falls back to GPT-4o |
 | Script | `stage2_script.py` | OpenAI GPT-4o | Returns marked-up script with `[BROLL:]`, `[PAUSE]`, `[EMPHASIS]`, `[AFFILIATE:]` cues |
 | SEO + affiliates | `stage5_monetize.py` | OpenAI | Run in parallel via `asyncio.gather` |
-| Voice | `stage3_voice.py` | ElevenLabs → PlayHT fallback | `strip_script_markup()` cleans cues before TTS; ffmpeg post-processes to -14 LUFS |
-| Thumbnail | `stage4_thumbnail.py` | OpenAI (concepts) + Fireworks SDXL | Generates 3 concepts, picks winner by `ctr_score` |
+| Voice | `stage3_voice.py` | OpenAI TTS → ElevenLabs fallback | `strip_script_markup()` cleans cues; chunked at 4000 chars; ffmpeg normalizes to -14 LUFS |
+| Thumbnail | `stage4_thumbnail.py` | OpenAI (concepts) + fal.ai Flux | Generates 3 concepts, renders all in parallel, winner picked by `ctr_score` |
 
 **Key models** (`models.py`): `VideoPackage` is the top-level container. `ResearchResult` → `Script` → `VoiceSpec` + `SEOPackage` + `AffiliateInsertion[]` + `ThumbnailConcept[]` all compose into it.
 
