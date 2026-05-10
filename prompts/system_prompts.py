@@ -22,8 +22,11 @@ total_score = (C * 0.4) + (E * 0.35) + (S * 0.25)
 
 Select the winning hook. Explain why in one sentence.
 
-Recent search context from Bing:
+Recent search context:
 {bing_context}
+
+Recently used topics (do NOT select any topic that is the same as or closely similar to these):
+{used_topics}
 
 Respond ONLY with valid JSON matching this exact schema:
 {{

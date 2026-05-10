@@ -93,7 +93,37 @@ async def run_pipeline_job(job_id: str, request: PipelineRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    from openai import AsyncOpenAI
+    from groq import AsyncGroq
+
+    async def check_openai() -> str:
+        try:
+            await AsyncOpenAI(api_key=settings.openai_api_key).models.list()
+            return "ok"
+        except Exception as e:
+            return f"error: {e}"
+
+    async def check_groq() -> str:
+        try:
+            await AsyncGroq(api_key=settings.groq_api_key).models.list()
+            return "ok"
+        except Exception as e:
+            return f"error: {e}"
+
+    openai_status, groq_status = await asyncio.gather(check_openai(), check_groq())
+    fal_status = "ok" if settings.fal_key else "missing"
+
+    all_ok = all(s == "ok" for s in [openai_status, groq_status, fal_status])
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "version": "1.0.0",
+        "providers": {
+            "openai": openai_status,
+            "groq": groq_status,
+            "fal": fal_status,
+            "elevenlabs": "configured" if settings.elevenlabs_api_key else "not configured (optional)",
+        },
+    }
 
 
 @app.post("/run")

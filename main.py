@@ -21,6 +21,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_USED_TOPICS_FILE = Path(settings.output_dir) / "used_topics.json"
+
+
+def load_used_topics() -> list[str]:
+    if _USED_TOPICS_FILE.exists():
+        return json.loads(_USED_TOPICS_FILE.read_text())
+    return []
+
+
+def save_used_topic(topic: str) -> None:
+    topics = load_used_topics()
+    if topic not in topics:
+        topics.append(topic)
+    _USED_TOPICS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _USED_TOPICS_FILE.write_text(json.dumps(topics, indent=2))
+
 
 async def run_pipeline(
     niche: str | None = None,
@@ -57,7 +73,10 @@ async def run_pipeline(
     # Stage 1: Research + hooks
     logger.info("Stage 1/5: Research + trend analysis")
     t0 = time.monotonic()
-    research = await run_research(niche, tone, demographic)
+    used_topics = load_used_topics()
+    if used_topics:
+        logger.info(f"Dedup: avoiding {len(used_topics)} previously used topic(s)")
+    research = await run_research(niche, tone, demographic, used_topics=used_topics)
     timings["research"] = round(time.monotonic() - t0, 2)
 
     # Stage 2: Script generation
@@ -141,6 +160,7 @@ async def run_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
     package_path = output_dir / f"{video_id}_package.json"
     package_path.write_text(package.model_dump_json(indent=2))
+    save_used_topic(research.selected_topic.topic_title)
 
     logger.info(f"=" * 60)
     logger.info(f"Pipeline complete: {video_id}")

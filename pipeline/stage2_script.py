@@ -11,10 +11,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_AFFILIATES = {
     "personal finance": ["Robinhood", "Acorns", "Personal Capital"],
-    "tech": ["Amazon", "NordVPN", "Skillshare"],
-    "health": ["AG1", "Whoop", "Calm"],
-    "productivity": ["Notion", "Todoist", "Grammarly"],
+    "investing": ["Public.com", "M1 Finance", "Masterworks"],
     "real estate": ["Fundrise", "Arrived Homes", "Roofstock"],
+    "tech": ["Amazon", "NordVPN", "Skillshare"],
+    "ai": ["Jasper", "Midjourney", "Copy.ai"],
+    "productivity": ["Notion", "Todoist", "Grammarly"],
+    "business": ["Shopify", "FreshBooks", "Fiverr"],
+    "entrepreneurship": ["Shopify", "Teachable", "ConvertKit"],
+    "health": ["AG1", "Whoop", "Calm"],
+    "fitness": ["MyProtein", "Gainful", "Whoop"],
+    "mental health": ["BetterHelp", "Calm", "Headspace"],
+    "cooking": ["HelloFresh", "Thrive Market", "Made In Cookware"],
+    "travel": ["Booking.com", "Airbnb", "SafetyWing"],
+    "gaming": ["Razer", "SteelSeries", "NordVPN"],
+    "beauty": ["Sephora", "ILIA Beauty", "Fenty Beauty"],
+    "fashion": ["ASOS", "ThredUp", "Rent the Runway"],
+    "parenting": ["KiwiCo", "Lovevery", "Amazon"],
+    "education": ["Skillshare", "Coursera", "Brilliant"],
+    "automotive": ["CarGurus", "Carvana", "Meineke"],
+    "pets": ["Chewy", "BarkBox", "Petco"],
 }
 
 

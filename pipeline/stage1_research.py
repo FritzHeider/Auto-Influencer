@@ -41,16 +41,18 @@ async def fetch_search_trends(niche: str) -> str:
     return "\n".join(results) if results else f"No live search results. Use your knowledge of {niche} trends."
 
 
-async def run_research(niche: str, tone: str, demographic: str) -> ResearchResult:
+async def run_research(niche: str, tone: str, demographic: str, used_topics: list[str] | None = None) -> ResearchResult:
     """Run full research stage: trend scraping + hook generation."""
     logger.info(f"Starting research for niche: {niche}")
 
     search_context = await fetch_search_trends(niche)
     logger.info(f"Search context fetched: {len(search_context)} chars")
 
+    used_topics_str = "\n".join(f"- {t}" for t in used_topics) if used_topics else "None"
     prompt = RESEARCH_PROMPT.format(
         niche=niche,
         bing_context=search_context,
+        used_topics=used_topics_str,
     )
 
     # Use Groq for speed on ideation
