@@ -14,19 +14,8 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_model: str = "gpt-4o"
 
-    # ElevenLabs — env var is ELEVEN_API_KEY (not ELEVENLABS_*)
-    elevenlabs_api_key: str = Field(validation_alias="ELEVEN_API_KEY")
-    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
-    elevenlabs_stability: float = 0.5
-    elevenlabs_similarity_boost: float = 0.75
-    elevenlabs_style: float = 0.0
-    elevenlabs_speaker_boost: bool = True
-
-    # PlayHT (fallback)
-    playht_api_key: str
-    playht_user_id: str
-    playht_voice: str = "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json"
-    playht_quality: str = "premium"
+    # ElevenLabs — optional fallback TTS, env var is ELEVEN_API_KEY
+    elevenlabs_api_key: Optional[str] = Field(default=None, validation_alias="ELEVEN_API_KEY")
 
     # Fireworks (image gen) — env var is FIREWORK_API_KEY (no trailing S)
     fireworks_api_key: str = Field(validation_alias="FIREWORK_API_KEY")

@@ -107,41 +107,29 @@ Script tone: {tone}
 Target demographic: {demographic}
 Estimated video length: {duration} minutes
 
-Select the optimal ElevenLabs voice configuration for this content profile.
+Select the optimal OpenAI TTS voice for this content profile.
 Consider: authority level, age perception, accent neutrality, pacing.
 
-Available ElevenLabs voices to choose from:
-- Rachel (21m00Tcm4TlvDq8ikWAM) — calm, professional female, American
-- Drew (29vD33N1CtxCmqQRPOHJ) — well-rounded male, American
-- Clyde (2EiwWnXFnvU5JabPnv8n) — war veteran male, American
-- Paul (5Q0t7uMcjvnagumLfvZi) — narration male, American
-- Domi (AZnzlk1XvdvUeBnXmlld) — strong female, American
-- Dave (CYw3kZ02Ow3r8GcIK5Ch) — conversational male, British
-- Fin (D38z5RcWu1voky8WS1ja) — sailor male, Irish
-- Bella (EXAVITQu4vr4xnSDxMaL) — soft female, American
-- Antoni (ErXwobaYiN019PkySvjV) — well-rounded male, American
-- Thomas (GBv7mTt0atIp3Br8iCZE) — calm male, American
-- Charlie (IKne3meq5aSn9XLyUdCD) — conversational male, Australian
-- George (JBFqnCBsd6RMkjVDRZzb) — warm male, British
-- Callum (N2lVS1w4EtoT3dr4eOWO) — hoarse male, Transatlantic
-- Patrick (ODq5zmih8GrVes37Dy39) — strong male, American
-- Harry (SOYHLrjzK2X1ezoPC6cr) — anxious male, American
-- Liam (TX3LPaxmHKxFdv7VOKKK) — articulate male, American
-- Dorothy (ThT5KcBeYPX3keUQqHPh) — pleasant female, British
-- Josh (TxGEqnHWrfWFTfGW9XjX) — deep male, American
-- Arnold (VR6AewLTigWG4xSOukaG) — crisp male, American
-- Adam (pNInz6obpgDQGcFmaJgB) — deep male, American
-- Sam (yoZ06aMxZJJ28mfd3POQ) — raspy male, American
+Available OpenAI voices:
+- alloy — neutral, balanced, American
+- ash — clear, confident male, American
+- coral — warm, engaging female, American
+- echo — measured, calm male, American
+- fable — expressive, storytelling male, British
+- nova — energetic, upbeat female, American
+- onyx — deep, authoritative male, American
+- sage — wise, thoughtful, American
+- shimmer — soft, friendly female, American
+
+Use "tts-1-hd" for best quality. Set speed between 0.9-1.1 (1.0 is normal).
 
 Respond ONLY with valid JSON:
 {{
-  "provider": "elevenlabs",
+  "provider": "openai",
   "voice_id": "string",
   "voice_name": "string",
-  "stability": 0.0,
-  "similarity_boost": 0.0,
-  "style": 0.0,
-  "speaker_boost": true,
+  "openai_model": "tts-1-hd",
+  "speed": 1.0,
   "ffmpeg_loudness_lufs": -14.0,
   "ffmpeg_eq_preset": "youtube",
   "rationale": "string"

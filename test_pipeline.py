@@ -194,8 +194,8 @@ class TestResearchStage:
             "selection_rationale": sample_research.selection_rationale,
         })
 
-        with patch("pipeline.stage1_research.fetch_bing_trends", new_callable=AsyncMock) as mock_bing:
-            mock_bing.return_value = "Mock bing context"
+        with patch("pipeline.stage1_research.fetch_search_trends", new_callable=AsyncMock) as mock_search:
+            mock_search.return_value = "Mock search context"
             with patch("pipeline.stage1_research.AsyncGroq") as mock_groq_cls:
                 mock_groq = AsyncMock()
                 mock_groq.chat.completions.create.return_value = mock_response
@@ -206,38 +206,56 @@ class TestResearchStage:
 
                 assert result.selected_topic.topic_title == sample_research.selected_topic.topic_title
                 assert result.winning_hook == sample_research.winning_hook
-                mock_bing.assert_called_once()
+                mock_search.assert_called_once()
 
 
 class TestVoiceStage:
     @pytest.mark.asyncio
-    async def test_elevenlabs_success_skips_playht(self, sample_script):
+    async def test_openai_tts_primary(self, sample_script):
         with patch("pipeline.stage3_voice.select_voice_spec", new_callable=AsyncMock) as mock_spec:
             mock_spec.return_value = VoiceSpec(
-                provider="elevenlabs",
-                voice_id="21m00Tcm4TlvDq8ikWAM",
-                voice_name="Rachel",
-                stability=0.5,
-                similarity_boost=0.75,
-                style=0.0,
-                speaker_boost=True,
+                provider="openai",
+                voice_id="onyx",
+                voice_name="onyx",
+                openai_model="tts-1-hd",
+                speed=1.0,
             )
-            with patch("pipeline.stage3_voice.generate_elevenlabs_audio", new_callable=AsyncMock) as mock_el:
-                mock_el.return_value = True
+            with patch("pipeline.stage3_voice.generate_openai_audio", new_callable=AsyncMock) as mock_oai:
+                mock_oai.return_value = True
                 with patch("pipeline.stage3_voice.post_process_audio", return_value=True):
                     from pipeline.stage3_voice import generate_voiceover
-                    from pathlib import Path
                     import tempfile
                     with tempfile.TemporaryDirectory() as tmpdir:
                         with patch("pipeline.stage3_voice.settings") as mock_settings:
                             mock_settings.audio_dir = tmpdir
-                            mock_settings.elevenlabs_api_key = "test"
-                            mock_settings.playht_api_key = "test"
-                            mock_settings.playht_user_id = "test"
-                            mock_settings.playht_voice = "test"
-                            mock_settings.playht_quality = "premium"
+                            mock_settings.openai_api_key = "test"
                             spec, path = await generate_voiceover(
                                 sample_script, "finance", "authoritative", "25-45", "vid_test"
                             )
-                            assert spec.provider == "elevenlabs"
-                            mock_el.assert_called_once()
+                            assert spec.provider == "openai"
+                            mock_oai.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_elevenlabs_fallback_on_openai_failure(self, sample_script):
+        with patch("pipeline.stage3_voice.select_voice_spec", new_callable=AsyncMock) as mock_spec:
+            mock_spec.return_value = VoiceSpec(
+                provider="openai",
+                voice_id="onyx",
+                voice_name="onyx",
+            )
+            with patch("pipeline.stage3_voice.generate_openai_audio", new_callable=AsyncMock) as mock_oai:
+                mock_oai.return_value = False
+                with patch("pipeline.stage3_voice.generate_elevenlabs_audio", new_callable=AsyncMock) as mock_el:
+                    mock_el.return_value = True
+                    with patch("pipeline.stage3_voice.post_process_audio", return_value=True):
+                        from pipeline.stage3_voice import generate_voiceover
+                        import tempfile
+                        with tempfile.TemporaryDirectory() as tmpdir:
+                            with patch("pipeline.stage3_voice.settings") as mock_settings:
+                                mock_settings.audio_dir = tmpdir
+                                mock_settings.openai_api_key = "test"
+                                spec, path = await generate_voiceover(
+                                    sample_script, "finance", "authoritative", "25-45", "vid_test"
+                                )
+                                mock_oai.assert_called_once()
+                                mock_el.assert_called_once()

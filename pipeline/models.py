@@ -50,13 +50,18 @@ class Script(BaseModel):
 
 
 class VoiceSpec(BaseModel):
-    provider: str  # elevenlabs or playht
-    voice_id: str
+    provider: str  # openai or elevenlabs
+    voice_id: str  # openai: alloy/onyx/nova/etc  elevenlabs: voice UUID
     voice_name: str
-    stability: float
-    similarity_boost: float
-    style: float
-    speaker_boost: bool
+    # OpenAI TTS fields
+    openai_model: str = "tts-1-hd"
+    speed: float = 1.0
+    # ElevenLabs fields (used only when provider=elevenlabs)
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+    style: float = 0.0
+    speaker_boost: bool = True
+    # Post-processing
     ffmpeg_loudness_lufs: float = -14.0
     ffmpeg_eq_preset: str = "youtube"
 

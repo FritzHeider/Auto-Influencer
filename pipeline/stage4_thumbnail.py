@@ -1,5 +1,4 @@
 import json
-import base64
 import logging
 from pathlib import Path
 
@@ -51,8 +50,8 @@ async def render_thumbnail_fireworks(concept: ThumbnailConcept, output_path: Pat
     payload = {
         "prompt": concept.fireworks_prompt,
         "negative_prompt": "text, watermark, logo, human face, person, nsfw, blurry, low quality",
-        "width": 1280,
-        "height": 720,
+        "width": 1344,
+        "height": 768,
         "num_inference_steps": 30,
         "guidance_scale": 7.5,
         "num_images": 1,
@@ -70,11 +69,7 @@ async def render_thumbnail_fireworks(concept: ThumbnailConcept, output_path: Pat
                 json=payload,
             )
             resp.raise_for_status()
-            data = resp.json()
-
-            image_b64 = data["output"][0]
-            image_bytes = base64.b64decode(image_b64)
-            output_path.write_bytes(image_bytes)
+            output_path.write_bytes(resp.content)
             logger.info(f"Thumbnail rendered: {output_path}")
             return True
         except Exception as e:
