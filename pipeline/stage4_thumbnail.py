@@ -5,6 +5,7 @@ from pathlib import Path
 import fal_client
 import httpx
 from openai import AsyncOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import settings
 from pipeline.models import Script, SEOPackage, ThumbnailConcept
@@ -47,7 +48,9 @@ async def generate_thumbnail_concepts(
 async def render_thumbnail_fal(concept: ThumbnailConcept, output_path: Path) -> bool:
     """Render winning thumbnail concept via fal.ai Flux."""
     fal_client.api_key = settings.fal_key
-    try:
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    async def _render():
         result = await fal_client.run_async(
             settings.fal_model,
             arguments={
@@ -66,10 +69,13 @@ async def render_thumbnail_fal(concept: ThumbnailConcept, output_path: Path) -> 
             resp = await client.get(image_url)
             resp.raise_for_status()
             output_path.write_bytes(resp.content)
+
+    try:
+        await _render()
         logger.info(f"Thumbnail rendered via fal.ai ({settings.fal_model}): {output_path}")
         return True
     except Exception as e:
-        logger.error(f"fal.ai image generation failed: {e}")
+        logger.error(f"fal.ai image generation failed after retries: {e}")
         return False
 
 

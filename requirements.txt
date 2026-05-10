@@ -7,5 +7,6 @@ groq
 httpx
 fal-client
 ddgs
+tenacity
 pytest
 pytest-asyncio

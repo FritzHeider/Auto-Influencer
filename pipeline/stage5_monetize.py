@@ -1,6 +1,7 @@
 import json
 import logging
 from openai import AsyncOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import settings
 from pipeline.models import Script, SEOPackage, AffiliateInsertion
@@ -9,6 +10,7 @@ from prompts.system_prompts import SEO_PROMPT, AFFILIATE_PROMPT
 logger = logging.getLogger(__name__)
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 async def generate_seo_package(
     script: Script,
     niche: str,
@@ -46,6 +48,7 @@ async def generate_seo_package(
     return seo
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 async def generate_affiliate_insertions(
     script: Script,
     niche: str,

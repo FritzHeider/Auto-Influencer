@@ -1,6 +1,7 @@
 import json
 import logging
 from openai import AsyncOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import settings
 from pipeline.models import Script, ScriptSection, ResearchResult
@@ -26,6 +27,7 @@ def get_affiliate_products(niche: str) -> list[str]:
     return ["Amazon", "Skillshare", "NordVPN"]
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 async def generate_script(research: ResearchResult, niche: str, tone: str, demographic: str) -> Script:
     """Generate full video script from research results."""
     logger.info(f"Generating script for: {research.selected_topic.topic_title}")

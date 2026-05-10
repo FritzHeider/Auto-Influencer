@@ -123,11 +123,14 @@ Available OpenAI voices:
 
 Use "tts-1-hd" for best quality. Set speed between 0.9-1.1 (1.0 is normal).
 
+voice_id and voice_name must be the exact voice identifier (e.g. "onyx"), not a description.
+
 Respond ONLY with valid JSON:
 {{
   "provider": "openai",
   "voice_id": "string",
   "voice_name": "string",
+  "voice_description": "human-readable description e.g. deep authoritative male",
   "openai_model": "tts-1-hd",
   "speed": 1.0,
   "ffmpeg_loudness_lufs": -14.0,
