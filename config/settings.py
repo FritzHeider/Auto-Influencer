@@ -17,9 +17,10 @@ class Settings(BaseSettings):
     # ElevenLabs — optional fallback TTS, env var is ELEVEN_API_KEY
     elevenlabs_api_key: Optional[str] = Field(default=None, validation_alias="ELEVEN_API_KEY")
 
-    # fal.ai (image gen)
+    # fal.ai (image + video gen)
     fal_key: str = Field(validation_alias="FAL_KEY")
     fal_model: str = "fal-ai/flux/dev"
+    fal_video_model: str = "fal-ai/kling-video/v1.6/standard/text-to-video"
 
     # Groq (fast ideation)
     groq_api_key: str
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     output_dir: str = "./output"
     audio_dir: str = "./output/audio"
     thumbnail_dir: str = "./output/thumbnails"
+    video_dir: str = "./output/video"
     script_dir: str = "./output/scripts"
 
     # n8n webhook

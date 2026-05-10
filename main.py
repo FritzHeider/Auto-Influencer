@@ -13,6 +13,7 @@ from pipeline.stage2_script import generate_script
 from pipeline.stage3_voice import generate_voiceover
 from pipeline.stage4_thumbnail import generate_thumbnail
 from pipeline.stage5_monetize import generate_seo_package, generate_affiliate_insertions
+from pipeline.stage6_video import generate_video
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +45,7 @@ async def run_pipeline(
     demographic: str | None = None,
     skip_voice: bool = False,
     skip_thumbnail: bool = False,
+    skip_video: bool = False,
 ) -> VideoPackage:
     """
     Run the full AI influencer content pipeline.
@@ -138,6 +140,22 @@ async def run_pipeline(
         )
         thumbnail_concepts = [winning_thumbnail]
 
+    # Stage 6: Video assembly (B-roll + audio)
+    video_path = None
+    if not skip_video and audio_path:
+        logger.info("Stage 6/6: Video assembly (fal.ai Kling B-roll + ffmpeg)")
+        t0 = time.monotonic()
+        video_path = await generate_video(script, audio_path, video_id)
+        timings["video"] = round(time.monotonic() - t0, 2)
+        if video_path:
+            logger.info(f"Video assembled: {video_path}")
+        else:
+            logger.warning("Video assembly failed — package saved without video")
+    elif skip_video:
+        logger.info("Stage 6/6: Skipped (skip_video=True)")
+    else:
+        logger.info("Stage 6/6: Skipped (no audio)")
+
     # Assemble final package
     package = VideoPackage(
         video_id=video_id,
@@ -151,6 +169,7 @@ async def run_pipeline(
         affiliates=affiliates,
         audio_path=audio_path,
         thumbnail_path=thumbnail_path,
+        video_path=video_path,
         status="ready",
         stage_timings=timings,
     )
@@ -169,6 +188,7 @@ async def run_pipeline(
     logger.info(f"Title: {seo.title}")
     logger.info(f"Audio: {audio_path or 'skipped'}")
     logger.info(f"Thumbnail: {thumbnail_path or 'skipped'}")
+    logger.info(f"Video: {video_path or 'skipped'}")
     logger.info(f"Timings: { {k: f'{v}s' for k, v in timings.items()} }")
     logger.info(f"Package saved: {package_path}")
     logger.info(f"=" * 60)
@@ -204,6 +224,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch", type=int, default=1, help="Number of videos to produce")
     parser.add_argument("--skip-voice", action="store_true", help="Skip TTS generation")
     parser.add_argument("--skip-thumbnail", action="store_true", help="Skip thumbnail generation")
+    parser.add_argument("--skip-video", action="store_true", help="Skip video assembly")
 
     args = parser.parse_args()
 
@@ -216,6 +237,7 @@ if __name__ == "__main__":
                 demographic=args.demographic,
                 skip_voice=args.skip_voice,
                 skip_thumbnail=args.skip_thumbnail,
+                skip_video=args.skip_video,
             )
         )
     else:
@@ -226,5 +248,6 @@ if __name__ == "__main__":
                 demographic=args.demographic,
                 skip_voice=args.skip_voice,
                 skip_thumbnail=args.skip_thumbnail,
+                skip_video=args.skip_video,
             )
         )

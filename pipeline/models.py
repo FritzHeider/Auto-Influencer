@@ -108,6 +108,7 @@ class VideoPackage(BaseModel):
     affiliates: list[AffiliateInsertion]
     audio_path: Optional[str] = None
     thumbnail_path: Optional[str] = None
+    video_path: Optional[str] = None
     status: str = "pending"
     stage_timings: dict[str, float] = Field(default_factory=dict)
 
