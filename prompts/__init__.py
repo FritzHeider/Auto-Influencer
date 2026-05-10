@@ -1,0 +1,17 @@
+from prompts.system_prompts import (
+    RESEARCH_PROMPT,
+    SCRIPT_PROMPT,
+    VOICE_SPEC_PROMPT,
+    THUMBNAIL_PROMPT,
+    SEO_PROMPT,
+    AFFILIATE_PROMPT,
+)
+
+__all__ = [
+    "RESEARCH_PROMPT",
+    "SCRIPT_PROMPT",
+    "VOICE_SPEC_PROMPT",
+    "THUMBNAIL_PROMPT",
+    "SEO_PROMPT",
+    "AFFILIATE_PROMPT",
+]
