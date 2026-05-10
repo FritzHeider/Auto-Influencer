@@ -3,12 +3,12 @@ import logging
 import re
 import subprocess
 import textwrap
+from dataclasses import dataclass, field
 from pathlib import Path
-
-from PIL import Image, ImageDraw, ImageFont
 
 import fal_client
 import httpx
+from PIL import Image, ImageDraw, ImageFont
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import settings
@@ -17,7 +17,9 @@ from pipeline.stage3_voice import strip_script_markup
 
 logger = logging.getLogger(__name__)
 
-BROLL_CLIP_SECONDS = 10  # Kling v2 master supports up to 10s
+BROLL_CLIP_SECONDS = 10   # Kling v2 master max duration
+MAX_CLIPS_PER_CUE = 3     # cap unique variants per cue (avoids runaway clip counts)
+AVATAR_MAX_SECONDS = 10   # max avatar clip duration per section
 
 
 # ── Timestamp helpers ────────────────────────────────────────────────────────
@@ -30,13 +32,15 @@ def _ts_to_seconds(ts: str) -> float:
 
 
 def _section_duration(section: ScriptSection) -> float:
-    return max(_ts_to_seconds(section.timestamp_end) - _ts_to_seconds(section.timestamp_start), 1.0)
+    return max(
+        _ts_to_seconds(section.timestamp_end) - _ts_to_seconds(section.timestamp_start),
+        1.0,
+    )
 
 
 # ── Script analysis ──────────────────────────────────────────────────────────
 
 def _extract_talking_points(content: str, max_points: int = 3) -> list[str]:
-    """Pull first N clean sentences from section as talking points."""
     clean = strip_script_markup(content)
     sentences = re.split(r"(?<=[.!?])\s+", clean.strip())
     points = []
@@ -48,36 +52,100 @@ def _extract_talking_points(content: str, max_points: int = 3) -> list[str]:
 
 
 def _enrich_prompt(cue: str, topic: str, section_content: str, variant: int) -> str:
-    """Build a rich, varied B-roll prompt grounded in the script."""
-    # Pull a topic phrase from the section content for extra relevance
-    context_phrase = strip_script_markup(section_content)[:80].split(".")[0].strip()
-
+    context = strip_script_markup(section_content)[:80].split(".")[0].strip()
     angles = [
         "cinematic wide shot of",
         "smooth close-up shot of",
         "overhead aerial view of",
-        "dynamic tracking shot following",
+        "dynamic tracking shot of",
         "dramatic low-angle shot of",
         "slow-motion capture of",
         "time-lapse sequence showing",
         "handheld documentary shot of",
     ]
-    angle = angles[variant % len(angles)]
-
     return (
-        f"{angle} {cue}, conveying the idea of '{context_phrase}', "
-        f"topic: {topic}, professional 4K cinematography, "
-        "natural lighting, smooth motion, no text, no watermarks, "
-        "cinematic color grading"
+        f"{angles[variant % len(angles)]} {cue}, "
+        f"conveying '{context}', topic: {topic}, "
+        "professional 4K cinematography, smooth motion, "
+        "no text, no watermarks, cinematic color grading"
     )
+
+
+# ── Clip plan ────────────────────────────────────────────────────────────────
+
+@dataclass
+class ClipSlot:
+    """Everything needed to generate and place one video segment."""
+    kind: str              # "card" | "avatar" | "broll"
+    sec_idx: int
+    cue_idx: int = 0
+    variant: int = 0
+    prompt: str = ""
+    points: list[str] = field(default_factory=list)
+    card_duration: float = 3.5
+    avatar_audio_start: float = 0.0
+    avatar_audio_dur: float = 0.0
+    out: Path = field(default=None)
+
+
+def _plan(script: Script, audio_path: str, work: Path) -> list[ClipSlot]:
+    slots: list[ClipSlot] = []
+    for sec_idx, section in enumerate(script.sections):
+        sec_dur = _section_duration(section)
+        sec_start = _ts_to_seconds(section.timestamp_start)
+        points = _extract_talking_points(section.content)
+        cues = section.broll_cues or [f"professional footage about {script.topic}"]
+
+        # Opening talking-points card
+        slots.append(ClipSlot(
+            kind="card", sec_idx=sec_idx,
+            points=points, card_duration=4.0,
+            out=work / f"s{sec_idx:02d}_open.mp4",
+        ))
+
+        # Avatar intro
+        av_dur = min(AVATAR_MAX_SECONDS, sec_dur * 0.35)
+        if av_dur >= 3.0:
+            slots.append(ClipSlot(
+                kind="avatar", sec_idx=sec_idx,
+                avatar_audio_start=sec_start, avatar_audio_dur=av_dur,
+                out=work / f"s{sec_idx:02d}_av.mp4",
+            ))
+
+        # B-roll clips per cue
+        broll_budget = max(sec_dur - 4.0 - av_dur, BROLL_CLIP_SECONDS * len(cues))
+        per_cue = broll_budget / len(cues)
+        n = min(MAX_CLIPS_PER_CUE, max(1, round(per_cue / BROLL_CLIP_SECONDS)))
+
+        for cue_idx, cue in enumerate(cues):
+            for v in range(n):
+                clip_num = len([s for s in slots if s.kind == "broll"])
+                slots.append(ClipSlot(
+                    kind="broll", sec_idx=sec_idx, cue_idx=cue_idx, variant=v,
+                    prompt=_enrich_prompt(cue, script.topic, section.content, v),
+                    out=work / f"c{clip_num:03d}.mp4",
+                ))
+            # Talking-points card between cues (not after the last one)
+            if cue_idx < len(cues) - 1:
+                slots.append(ClipSlot(
+                    kind="card", sec_idx=sec_idx, cue_idx=cue_idx,
+                    points=points, card_duration=3.0,
+                    out=work / f"s{sec_idx:02d}_cue{cue_idx:02d}_tp.mp4",
+                ))
+
+    broll_count = sum(1 for s in slots if s.kind == "broll")
+    avatar_count = sum(1 for s in slots if s.kind == "avatar")
+    logger.info(f"Plan: {len(slots)} segments — {broll_count} B-roll, {avatar_count} avatar, "
+                f"{len(slots)-broll_count-avatar_count} cards")
+    return slots
 
 
 # ── FFmpeg helpers ───────────────────────────────────────────────────────────
 
-def _split_audio(audio_path: str, start_sec: float, duration_sec: float, out: Path) -> bool:
+def _split_audio(audio_path: str, start: float, dur: float, out: Path) -> bool:
     cmd = [
         "ffmpeg", "-y", "-i", audio_path,
-        "-ss", str(start_sec), "-t", str(duration_sec),
+        "-ss", str(start), "-t", str(dur),
         "-c", "copy", str(out),
     ]
     try:
@@ -88,81 +156,11 @@ def _split_audio(audio_path: str, start_sec: float, duration_sec: float, out: Pa
         return False
 
 
-def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """Load best available font, falling back to PIL default."""
-    candidates = [
-        "/Library/Fonts/ArialCE.ttf",
-        "/Library/Fonts/Hack-Regular.ttf",
-        "/Library/Fonts/SF-Pro.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/System/Library/Fonts/SFNSText.ttf",
-    ]
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size)
-        except (OSError, IOError):
-            continue
-    return ImageFont.load_default()
-
-
-def make_talking_points_card(points: list[str], duration: float, out: Path) -> bool:
-    """Render a dark slide with bullet points using Pillow, then encode to MP4."""
-    if not points:
-        points = ["Key Insights"]
-
-    W, H = 1280, 720
-    BG = (13, 17, 23)        # near-black
-    ACCENT = (99, 110, 125)  # muted gray
-    FG = (230, 230, 230)     # near-white
-
-    img = Image.new("RGB", (W, H), BG)
-    draw = ImageDraw.Draw(img)
-
-    label_font = _load_font(22)
-    body_font = _load_font(30)
-
-    draw.text((80, 55), "KEY POINTS", font=label_font, fill=ACCENT)
-
-    # Horizontal rule
-    draw.line([(80, 95), (W - 80, 95)], fill=(40, 50, 60), width=1)
-
-    y = 115
-    for pt in points[:4]:
-        lines = textwrap.wrap(pt, width=62)
-        for j, line in enumerate(lines):
-            prefix = "•  " if j == 0 else "    "
-            draw.text((80, y), prefix + line, font=body_font, fill=FG)
-            y += 42
-        y += 14  # extra gap between points
-
-    # Save as PNG then encode to MP4 with ffmpeg
-    png_path = out.with_suffix(".png")
-    img.save(str(png_path))
-
-    frames = max(1, int(duration * 24))
-    cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1", "-i", str(png_path),
-        "-vf", "format=yuv420p",
-        "-r", "24", "-frames:v", str(frames),
-        "-c:v", "libx264", "-preset", "fast",
-        str(out),
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        return r.returncode == 0
-    except Exception as e:
-        logger.error(f"Talking points card encode failed: {e}")
-        return False
-    finally:
-        png_path.unlink(missing_ok=True)
-
-
 def _normalize(src: Path, dst: Path) -> bool:
-    """Transcode to consistent 1280x720 @ 24fps h264 for concat."""
     cmd = [
         "ffmpeg", "-y", "-i", str(src),
-        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
+               "pad=1280:720:(ow-iw)/2:(oh-ih)/2",
         "-r", "24", "-c:v", "libx264", "-preset", "fast", "-an",
         str(dst),
     ]
@@ -205,24 +203,75 @@ def _mix_audio(video: Path, audio: str, out: Path) -> bool:
         if r.returncode == 0:
             logger.info(f"Final video: {out}")
             return True
-        logger.error(f"Mix failed: {r.stderr[-500:]}")
+        logger.error(f"Mix failed: {r.stderr[-400:]}")
         return False
     except Exception as e:
         logger.error(f"Mix exception: {e}")
         return False
 
 
+# ── Pillow card renderer ─────────────────────────────────────────────────────
+
+def _load_font(size: int):
+    for path in [
+        "/Library/Fonts/ArialCE.ttf",
+        "/Library/Fonts/Hack-Regular.ttf",
+        "/Library/Fonts/SF-Pro.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+    ]:
+        try:
+            return ImageFont.truetype(path, size)
+        except (OSError, IOError):
+            continue
+    return ImageFont.load_default()
+
+
+def _make_card(slot: ClipSlot) -> bool:
+    W, H = 1280, 720
+    img = Image.new("RGB", (W, H), (13, 17, 23))
+    draw = ImageDraw.Draw(img)
+    draw.text((80, 55), "KEY POINTS", font=_load_font(22), fill=(99, 110, 125))
+    draw.line([(80, 95), (W - 80, 95)], fill=(40, 50, 60), width=1)
+
+    y = 115
+    body = _load_font(30)
+    for pt in slot.points[:4]:
+        for j, line in enumerate(textwrap.wrap(pt, width=60)):
+            draw.text((80, y), ("•  " if j == 0 else "    ") + line, font=body, fill=(230, 230, 230))
+            y += 44
+        y += 16
+
+    png = slot.out.with_suffix(".png")
+    img.save(str(png))
+    frames = max(1, int(slot.card_duration * 24))
+    cmd = [
+        "ffmpeg", "-y",
+        "-loop", "1", "-i", str(png),
+        "-vf", "format=yuv420p",
+        "-r", "24", "-frames:v", str(frames),
+        "-c:v", "libx264", "-preset", "fast",
+        str(slot.out),
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        return r.returncode == 0
+    except Exception as e:
+        logger.error(f"Card encode failed: {e}")
+        return False
+    finally:
+        png.unlink(missing_ok=True)
+
+
 # ── fal.ai generators ────────────────────────────────────────────────────────
 
-async def _generate_avatar_image(niche: str, topic: str) -> bytes | None:
-    """Generate a reusable presenter portrait with Flux."""
+async def _generate_avatar_image(niche: str) -> bytes | None:
     fal_client.api_key = settings.fal_key
     try:
         result = await fal_client.run_async(
             "fal-ai/flux/dev",
             arguments={
                 "prompt": (
-                    f"professional {niche} content creator, looking directly at camera, "
+                    f"professional {niche} YouTube presenter, looking directly at camera, "
                     "clean modern studio background with soft bokeh, business casual, "
                     "warm confident expression, portrait photograph, sharp focus, 4K"
                 ),
@@ -243,13 +292,15 @@ async def _generate_avatar_image(niche: str, topic: str) -> bytes | None:
         return None
 
 
-async def _generate_avatar_clip(avatar_bytes: bytes, audio_path: Path, out: Path) -> bool:
-    """Lip-synced talking head via SadTalker."""
-    fal_client.api_key = settings.fal_key
+async def _run_avatar_slot(slot: ClipSlot, avatar_bytes: bytes, audio_path: str, work: Path) -> bool:
+    aud = work / f"s{slot.sec_idx:02d}_aud.mp3"
+    raw = work / f"s{slot.sec_idx:02d}_av_raw.mp4"
+    if not _split_audio(audio_path, slot.avatar_audio_start, slot.avatar_audio_dur, aud):
+        return False
     try:
         image_url, audio_url = await asyncio.gather(
             fal_client.upload_async(avatar_bytes, "image/jpeg"),
-            fal_client.upload_async(audio_path.read_bytes(), "audio/mpeg"),
+            fal_client.upload_async(aud.read_bytes(), "audio/mpeg"),
         )
         result = await fal_client.run_async(
             settings.fal_avatar_model,
@@ -265,23 +316,28 @@ async def _generate_avatar_clip(avatar_bytes: bytes, audio_path: Path, out: Path
         async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.get(result["video"]["url"])
             resp.raise_for_status()
-            out.write_bytes(resp.content)
-        logger.info(f"Avatar clip: {out.name}")
-        return True
-    except Exception as e:
-        logger.warning(f"Avatar clip failed (skipping): {e}")
+            raw.write_bytes(resp.content)
+        if _normalize(raw, slot.out):
+            logger.info(f"Avatar: {slot.out.name}")
+            raw.unlink(missing_ok=True)
+            return True
         return False
+    except Exception as e:
+        logger.warning(f"Avatar slot failed (s{slot.sec_idx}): {e}")
+        return False
+    finally:
+        aud.unlink(missing_ok=True)
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=3, max=15), reraise=True)
-async def _generate_broll_clip(prompt: str, out: Path) -> bool:
-    """Single unique B-roll clip via Kling v2 master (10s, 16:9)."""
+async def _run_broll_slot(slot: ClipSlot) -> bool:
     fal_client.api_key = settings.fal_key
+    raw = slot.out.with_suffix(".raw.mp4")
     try:
         result = await fal_client.run_async(
             settings.fal_video_model,
             arguments={
-                "prompt": prompt,
+                "prompt": slot.prompt,
                 "duration": "10",
                 "aspect_ratio": "16:9",
             },
@@ -289,102 +345,75 @@ async def _generate_broll_clip(prompt: str, out: Path) -> bool:
         async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.get(result["video"]["url"])
             resp.raise_for_status()
-            out.write_bytes(resp.content)
-        logger.info(f"B-roll: {out.name}")
-        return True
-    except Exception as e:
-        logger.error(f"B-roll failed '{prompt[:60]}': {e}")
+            raw.write_bytes(resp.content)
+        if _normalize(raw, slot.out):
+            logger.info(f"B-roll: {slot.out.name}")
+            raw.unlink(missing_ok=True)
+            return True
         return False
+    except Exception as e:
+        logger.error(f"B-roll failed '{slot.prompt[:50]}': {e}")
+        raw.unlink(missing_ok=True)
+        return False
+
+
+async def _run_slot(slot: ClipSlot, avatar_bytes: bytes | None, audio_path: str, work: Path) -> bool:
+    if slot.kind == "card":
+        return _make_card(slot)
+    if slot.kind == "avatar":
+        if avatar_bytes:
+            return await _run_avatar_slot(slot, avatar_bytes, audio_path, work)
+        return False
+    if slot.kind == "broll":
+        return await _run_broll_slot(slot)
+    return False
 
 
 # ── Main orchestrator ────────────────────────────────────────────────────────
 
 async def generate_video(script: Script, audio_path: str, video_id: str) -> str | None:
     """
-    Assemble final video:
-      per section → [talking points card] + [lip-synced avatar] + [B-roll clips]
-      between every cue → [talking points card]
-    All B-roll clips are unique variants (no looping).
-    Final assembly mixes in the full voiceover.
+    Full video assembly:
+    1. Plan all segments upfront
+    2. Generate avatar image once, then fire ALL segments in parallel
+    3. Concat in planned order, mix voiceover
     """
     video_dir = Path(settings.video_dir)
     video_dir.mkdir(parents=True, exist_ok=True)
     work = video_dir / video_id
     work.mkdir(exist_ok=True)
 
-    # Generate the presenter avatar once
-    logger.info("Generating presenter avatar image...")
+    # 1. Generate presenter avatar image
+    logger.info("Generating presenter avatar...")
     niche_hint = " ".join(script.topic.split()[:2])
-    avatar_bytes = await _generate_avatar_image(niche_hint, script.topic)
+    avatar_bytes = await _generate_avatar_image(niche_hint)
 
+    # 2. Plan all segments
+    fal_client.api_key = settings.fal_key
+    slots = _plan(script, audio_path, work)
+
+    # 3. Generate all segments in parallel
+    logger.info(f"Generating {len(slots)} segments in parallel...")
+    results = await asyncio.gather(*[
+        _run_slot(s, avatar_bytes, audio_path, work)
+        for s in slots
+    ], return_exceptions=True)
+
+    # 4. Collect successful segments in plan order
     segments: list[Path] = []
-    clip_idx = 0
-
-    for sec_idx, section in enumerate(script.sections):
-        sec_dur = _section_duration(section)
-        sec_start = _ts_to_seconds(section.timestamp_start)
-        points = _extract_talking_points(section.content)
-        cues = section.broll_cues or [f"professional footage representing {script.topic}"]
-
-        logger.info(f"Section {sec_idx + 1}/{len(script.sections)}: {section.label} ({sec_dur:.0f}s, {len(cues)} cues)")
-
-        # ① Talking points card — opens each section
-        card = work / f"s{sec_idx:02d}_open.mp4"
-        if make_talking_points_card(points, 4.0, card):
-            segments.append(card)
-
-        # ② Lip-synced avatar intro — covers first portion of section audio
-        avatar_clip_dur = min(10.0, sec_dur * 0.35)
-        if avatar_bytes and avatar_clip_dur >= 3.0:
-            aud = work / f"s{sec_idx:02d}_aud.mp3"
-            av_raw = work / f"s{sec_idx:02d}_av_raw.mp4"
-            av_norm = work / f"s{sec_idx:02d}_av.mp4"
-            if _split_audio(audio_path, sec_start, avatar_clip_dur, aud):
-                ok = await _generate_avatar_clip(avatar_bytes, aud, av_raw)
-                if ok and _normalize(av_raw, av_norm):
-                    segments.append(av_norm)
-                    av_raw.unlink(missing_ok=True)
-            aud.unlink(missing_ok=True)
-
-        # ③ B-roll clips — unique variants per cue, no looping
-        broll_budget = max(sec_dur - 4.0 - avatar_clip_dur, BROLL_CLIP_SECONDS * len(cues))
-        per_cue_time = broll_budget / len(cues)
-        n_per_cue = max(1, round(per_cue_time / BROLL_CLIP_SECONDS))
-
-        for cue_idx, cue in enumerate(cues):
-            prompts = [
-                _enrich_prompt(cue, script.topic, section.content, v)
-                for v in range(n_per_cue)
-            ]
-            raw_paths = [work / f"c{clip_idx + v:03d}_raw.mp4" for v in range(n_per_cue)]
-
-            results = await asyncio.gather(*[
-                _generate_broll_clip(p, rp) for p, rp in zip(prompts, raw_paths)
-            ])
-
-            for v, (raw, ok) in enumerate(zip(raw_paths, results)):
-                if ok:
-                    norm = work / f"c{clip_idx + v:03d}.mp4"
-                    if _normalize(raw, norm):
-                        segments.append(norm)
-                    raw.unlink(missing_ok=True)
-
-            clip_idx += n_per_cue
-
-            # Talking points card between cues (skip after last cue in section)
-            if cue_idx < len(cues) - 1:
-                between = work / f"s{sec_idx:02d}_c{cue_idx:02d}_tp.mp4"
-                if make_talking_points_card(points, 3.0, between):
-                    segments.append(between)
+    for slot, ok in zip(slots, results):
+        if ok is True and slot.out.exists():
+            segments.append(slot.out)
+        elif isinstance(ok, Exception):
+            logger.warning(f"Slot {slot.kind} s{slot.sec_idx} raised: {ok}")
 
     if not segments:
-        logger.error("No segments produced — aborting")
+        logger.error("No segments produced")
         return None
 
-    logger.info(f"Concatenating {len(segments)} segments...")
+    logger.info(f"Concatenating {len(segments)}/{len(slots)} segments...")
     silent = video_dir / f"{video_id}_silent.mp4"
     if not _concat(segments, silent):
-        logger.error("Concat failed")
         return None
 
     final = video_dir / f"{video_id}_final.mp4"
