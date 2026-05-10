@@ -1,0 +1,443 @@
+{
+  "name": "AI Influencer Channel — Content Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1,3,5"
+            }
+          ]
+        }
+      },
+      "id": "node_schedule_trigger",
+      "name": "Schedule Trigger (Mon/Wed/Fri 9am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-influencer-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node_webhook_trigger",
+      "name": "Manual Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 480]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field_niche",
+              "name": "niche",
+              "value": "={{ $json.niche || 'personal finance' }}",
+              "type": "string"
+            },
+            {
+              "id": "field_tone",
+              "name": "tone",
+              "value": "={{ $json.tone || 'authoritative' }}",
+              "type": "string"
+            },
+            {
+              "id": "field_demographic",
+              "name": "demographic",
+              "value": "={{ $json.demographic || '25-45 year old professionals' }}",
+              "type": "string"
+            },
+            {
+              "id": "field_skip_voice",
+              "name": "skip_voice",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "field_skip_thumbnail",
+              "name": "skip_thumbnail",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node_set_config",
+      "name": "Set Channel Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [460, 390]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/run/sync",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $env.PIPELINE_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "niche",
+              "value": "={{ $json.niche }}"
+            },
+            {
+              "name": "tone",
+              "value": "={{ $json.tone }}"
+            },
+            {
+              "name": "demographic",
+              "value": "={{ $json.demographic }}"
+            },
+            {
+              "name": "skip_voice",
+              "value": "={{ $json.skip_voice }}"
+            },
+            {
+              "name": "skip_thumbnail",
+              "value": "={{ $json.skip_thumbnail }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "node_run_pipeline",
+      "name": "Run Content Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 390]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond_status",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "complete",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node_check_status",
+      "name": "Pipeline Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 390]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field_video_id",
+              "name": "video_id",
+              "value": "={{ $json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "field_title",
+              "name": "youtube_title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "field_description",
+              "name": "youtube_description",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "field_tags",
+              "name": "youtube_tags",
+              "value": "={{ $json.tags.join(',') }}",
+              "type": "string"
+            },
+            {
+              "id": "field_script",
+              "name": "script_text",
+              "value": "={{ $json.full_script }}",
+              "type": "string"
+            },
+            {
+              "id": "field_audio",
+              "name": "audio_path",
+              "value": "={{ $json.audio_path }}",
+              "type": "string"
+            },
+            {
+              "id": "field_thumbnail",
+              "name": "thumbnail_path",
+              "value": "={{ $json.thumbnail_path }}",
+              "type": "string"
+            },
+            {
+              "id": "field_hook",
+              "name": "hook",
+              "value": "={{ $json.hook }}",
+              "type": "string"
+            },
+            {
+              "id": "field_duration",
+              "name": "duration_min",
+              "value": "={{ $json.duration_min }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node_extract_assets",
+      "name": "Extract Video Assets",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.CONTENT_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Videos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "video_id": "={{ $json.video_id }}",
+            "title": "={{ $json.youtube_title }}",
+            "hook": "={{ $json.hook }}",
+            "duration_min": "={{ $json.duration_min }}",
+            "audio_path": "={{ $json.audio_path }}",
+            "thumbnail_path": "={{ $json.thumbnail_path }}",
+            "tags": "={{ $json.youtube_tags }}",
+            "status": "ready_to_edit",
+            "created_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "node_log_to_sheets",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $env.SLACK_CHANNEL_ID }}",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": {
+          "blocksValues": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "New Video Ready: {{ $json.youtube_title }}"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Hook:*\n{{ $json.hook }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Duration:*\n{{ $json.duration_min }} min"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Audio:* `{{ $json.audio_path }}`\n*Thumbnail:* `{{ $json.thumbnail_path }}`"
+              }
+            }
+          ]
+        }
+      },
+      "id": "node_slack_notify",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "sendTo": "={{ $env.NOTIFY_EMAIL }}",
+        "subject": "New Video Ready: {{ $json.youtube_title }}",
+        "emailType": "html",
+        "message": "<h2>New Video Package Ready</h2><p><strong>Title:</strong> {{ $json.youtube_title }}</p><p><strong>Hook:</strong> {{ $json.hook }}</p><p><strong>Duration:</strong> {{ $json.duration_min }} minutes</p><p><strong>Audio:</strong> {{ $json.audio_path }}</p><p><strong>Thumbnail:</strong> {{ $json.thumbnail_path }}</p><hr><p><strong>Description:</strong><br>{{ $json.youtube_description }}</p>"
+      },
+      "id": "node_email_notify",
+      "name": "Email Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1340, 580]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $env.SLACK_CHANNEL_ID }}",
+          "mode": "id"
+        },
+        "messageType": "text",
+        "text": "Pipeline failed for {{ $json.niche }} at {{ $now.toISO() }}. Error: {{ $json.error || 'unknown' }}"
+      },
+      "id": "node_slack_error",
+      "name": "Slack Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1120, 520]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Mon/Wed/Fri 9am)": {
+      "main": [
+        [
+          {
+            "node": "Set Channel Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Channel Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Channel Config": {
+      "main": [
+        [
+          {
+            "node": "Run Content Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Content Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Pipeline Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Extract Video Assets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video Assets": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "tag_ai_influencer",
+      "name": "ai-influencer"
+    }
+  ],
+  "triggerCount": 2,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,20 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Output artifacts
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+
+# macOS
+.DS_Store
