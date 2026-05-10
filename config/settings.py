@@ -32,10 +32,6 @@ class Settings(BaseSettings):
     fireworks_api_key: str = Field(validation_alias="FIREWORK_API_KEY")
     fireworks_model: str = "accounts/fireworks/models/stable-diffusion-xl-1024-v1-0"
 
-    # Bing Search
-    bing_api_key: str
-    bing_search_endpoint: str = "https://api.bing.microsoft.com/v7.0/search"
-
     # Groq (fast ideation)
     groq_api_key: str
     groq_model: str = "llama-3.3-70b-versatile"

@@ -1,8 +1,9 @@
+import asyncio
 import json
-import httpx
 import logging
 from openai import AsyncOpenAI
 from groq import AsyncGroq
+from ddgs import DDGS
 
 from config.settings import settings
 from pipeline.models import ResearchResult, TrendTopic, HookOption
@@ -11,30 +12,26 @@ from prompts.system_prompts import RESEARCH_PROMPT
 logger = logging.getLogger(__name__)
 
 
-async def fetch_bing_trends(niche: str) -> str:
-    """Fetch trending content from Bing Search for context."""
+async def fetch_search_trends(niche: str) -> str:
+    """Fetch trending content via DuckDuckGo for research context."""
     queries = [
         f"{niche} news today",
-        f"{niche} trending 2024",
-        f"best {niche} tips viral",
+        f"{niche} trending tips",
+        f"best {niche} advice viral",
     ]
     results = []
 
-    async with httpx.AsyncClient() as client:
-        for query in queries:
-            try:
-                resp = await client.get(
-                    settings.bing_search_endpoint,
-                    headers={"Ocp-Apim-Subscription-Key": settings.bing_api_key},
-                    params={"q": query, "count": 5, "freshness": "Day"},
-                    timeout=10.0,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                for item in data.get("webPages", {}).get("value", [])[:3]:
-                    results.append(f"- {item['name']}: {item['snippet']}")
-            except Exception as e:
-                logger.warning(f"Bing search failed for '{query}': {e}")
+    def _search(query: str) -> list[dict]:
+        try:
+            return list(DDGS().text(query, max_results=3))
+        except Exception as e:
+            logger.warning(f"DDG search failed for '{query}': {e}")
+            return []
+
+    for query in queries:
+        hits = await asyncio.get_event_loop().run_in_executor(None, _search, query)
+        for hit in hits:
+            results.append(f"- {hit['title']}: {hit['body'][:120]}")
 
     return "\n".join(results) if results else f"No live search results. Use your knowledge of {niche} trends."
 
@@ -43,12 +40,12 @@ async def run_research(niche: str, tone: str, demographic: str) -> ResearchResul
     """Run full research stage: trend scraping + hook generation."""
     logger.info(f"Starting research for niche: {niche}")
 
-    bing_context = await fetch_bing_trends(niche)
-    logger.info(f"Bing context fetched: {len(bing_context)} chars")
+    search_context = await fetch_search_trends(niche)
+    logger.info(f"Search context fetched: {len(search_context)} chars")
 
     prompt = RESEARCH_PROMPT.format(
         niche=niche,
-        bing_context=bing_context,
+        bing_context=search_context,
     )
 
     # Use Groq for speed on ideation
