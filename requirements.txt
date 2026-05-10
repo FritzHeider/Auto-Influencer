@@ -8,5 +8,6 @@ httpx
 fal-client
 ddgs
 tenacity
+pillow
 pytest
 pytest-asyncio

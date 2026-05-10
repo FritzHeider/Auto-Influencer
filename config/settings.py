@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     # fal.ai (image + video gen)
     fal_key: str = Field(validation_alias="FAL_KEY")
     fal_model: str = "fal-ai/flux/dev"
-    fal_video_model: str = "fal-ai/kling-video/v1.6/standard/text-to-video"
+    fal_video_model: str = "fal-ai/kling-video/v2/master/text-to-video"
+    fal_avatar_model: str = "fal-ai/sadtalker"
 
     # Groq (fast ideation)
     groq_api_key: str
