@@ -3,7 +3,7 @@ import json
 import asyncio
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from config.settings import settings
 from pipeline.models import VideoPackage
@@ -45,7 +45,7 @@ async def run_pipeline(
     tone = tone or settings.channel_tone
     demographic = demographic or settings.channel_demographic
 
-    video_id = f"vid_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    video_id = f"vid_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     logger.info(f"=" * 60)
     logger.info(f"Starting pipeline for video: {video_id}")
     logger.info(f"Niche: {niche} | Tone: {tone} | Demo: {demographic}")
