@@ -86,7 +86,7 @@ async def run_pipeline(
     winning_thumbnail = None
     thumbnail_path = None
     if not skip_thumbnail:
-        logger.info("Stage 5/5: Thumbnail generation (Fireworks AI)")
+        logger.info("Stage 5/5: Thumbnail generation (fal.ai Flux)")
         thumbnail_concepts, winning_thumbnail, thumbnail_path = await generate_thumbnail(
             script, seo, niche, video_id
         )
