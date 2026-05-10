@@ -144,7 +144,7 @@ class TestModels:
             text_overlay="STOP LOSING MONEY",
             accent_elements=["red warning border", "dollar sign icon"],
             color_mood="high contrast",
-            fireworks_prompt="Photorealistic stack of gold coins...",
+            image_prompt="Photorealistic stack of gold coins...",
             ctr_score=8.2,
             is_winner=True,
         )

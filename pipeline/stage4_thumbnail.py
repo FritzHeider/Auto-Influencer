@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 
+import fal_client
 import httpx
 from openai import AsyncOpenAI
 
@@ -10,8 +11,6 @@ from pipeline.models import Script, SEOPackage, ThumbnailConcept
 from prompts.system_prompts import THUMBNAIL_PROMPT
 
 logger = logging.getLogger(__name__)
-
-FIREWORKS_IMAGE_URL = "https://api.fireworks.ai/inference/v1/image_generation/accounts/fireworks/models/stable-diffusion-xl-1024-v1-0"
 
 
 async def generate_thumbnail_concepts(
@@ -45,36 +44,33 @@ async def generate_thumbnail_concepts(
     return concepts
 
 
-async def render_thumbnail_fireworks(concept: ThumbnailConcept, output_path: Path) -> bool:
-    """Render winning thumbnail concept via Fireworks AI."""
-    payload = {
-        "prompt": concept.fireworks_prompt,
-        "negative_prompt": "text, watermark, logo, human face, person, nsfw, blurry, low quality",
-        "width": 1344,
-        "height": 768,
-        "num_inference_steps": 30,
-        "guidance_scale": 7.5,
-        "num_images": 1,
-        "output_image_format": "JPEG",
-    }
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            resp = await client.post(
-                FIREWORKS_IMAGE_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.fireworks_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
+async def render_thumbnail_fal(concept: ThumbnailConcept, output_path: Path) -> bool:
+    """Render winning thumbnail concept via fal.ai Flux."""
+    fal_client.api_key = settings.fal_key
+    try:
+        result = await fal_client.run_async(
+            settings.fal_model,
+            arguments={
+                "prompt": concept.image_prompt,
+                "negative_prompt": "text, watermark, logo, human face, person, nsfw, blurry, low quality",
+                "image_size": {"width": 1344, "height": 768},
+                "num_inference_steps": 28,
+                "guidance_scale": 3.5,
+                "num_images": 1,
+                "output_format": "jpeg",
+                "enable_safety_checker": False,
+            },
+        )
+        image_url = result["images"][0]["url"]
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.get(image_url)
             resp.raise_for_status()
             output_path.write_bytes(resp.content)
-            logger.info(f"Thumbnail rendered: {output_path}")
-            return True
-        except Exception as e:
-            logger.error(f"Fireworks image generation failed: {e}")
-            return False
+        logger.info(f"Thumbnail rendered via fal.ai ({settings.fal_model}): {output_path}")
+        return True
+    except Exception as e:
+        logger.error(f"fal.ai image generation failed: {e}")
+        return False
 
 
 async def generate_thumbnail(
@@ -91,7 +87,7 @@ async def generate_thumbnail(
     winner = next((c for c in concepts if c.is_winner), concepts[0])
 
     output_path = thumbnail_dir / f"{video_id}_thumbnail.jpg"
-    success = await render_thumbnail_fireworks(winner, output_path)
+    success = await render_thumbnail_fal(winner, output_path)
 
     thumbnail_path = str(output_path) if success else None
     return concepts, winner, thumbnail_path

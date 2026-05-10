@@ -157,7 +157,7 @@ Respond ONLY with valid JSON:
       "text_overlay": "max 4 words",
       "accent_elements": ["string"],
       "color_mood": "string",
-      "fireworks_prompt": "detailed 150-200 word image generation prompt, style photorealistic, 1280x720, no human faces, --no text logos watermarks",
+      "image_prompt": "detailed 150-200 word image generation prompt, style photorealistic, 1344x768, no human faces, no text, no logos, no watermarks",
       "ctr_score": 0.0,
       "is_winner": false
     }}

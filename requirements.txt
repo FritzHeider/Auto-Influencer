@@ -5,6 +5,7 @@ pydantic-settings
 openai
 groq
 httpx
+fal-client
 ddgs
 pytest
 pytest-asyncio

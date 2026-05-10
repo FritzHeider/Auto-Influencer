@@ -70,19 +70,15 @@ async def run_pipeline(
     voice_spec = None
     audio_path = None
     if not skip_voice:
-        logger.info("Stage 4/5: Voice generation (ElevenLabs → PlayHT fallback)")
+        logger.info("Stage 4/5: Voice generation (OpenAI TTS → ElevenLabs fallback)")
         voice_spec, audio_path = await generate_voiceover(script, niche, tone, demographic, video_id)
     else:
         logger.info("Stage 4/5: Skipped (skip_voice=True)")
         from pipeline.models import VoiceSpec
         voice_spec = VoiceSpec(
-            provider="elevenlabs",
-            voice_id=settings.elevenlabs_voice_id,
-            voice_name="default",
-            stability=0.5,
-            similarity_boost=0.75,
-            style=0.0,
-            speaker_boost=True,
+            provider="openai",
+            voice_id="onyx",
+            voice_name="onyx",
         )
 
     # Stage 5: Thumbnail generation

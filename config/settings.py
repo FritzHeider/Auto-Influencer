@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     # ElevenLabs — optional fallback TTS, env var is ELEVEN_API_KEY
     elevenlabs_api_key: Optional[str] = Field(default=None, validation_alias="ELEVEN_API_KEY")
 
-    # Fireworks (image gen) — env var is FIREWORK_API_KEY (no trailing S)
-    fireworks_api_key: str = Field(validation_alias="FIREWORK_API_KEY")
-    fireworks_model: str = "accounts/fireworks/models/stable-diffusion-xl-1024-v1-0"
+    # fal.ai (image gen)
+    fal_key: str = Field(validation_alias="FAL_KEY")
+    fal_model: str = "fal-ai/flux/dev"
 
     # Groq (fast ideation)
     groq_api_key: str

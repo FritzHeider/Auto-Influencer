@@ -73,7 +73,7 @@ class ThumbnailConcept(BaseModel):
     text_overlay: str
     accent_elements: list[str]
     color_mood: str
-    fireworks_prompt: str
+    image_prompt: str
     ctr_score: float
     is_winner: bool = False
 
