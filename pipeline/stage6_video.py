@@ -143,10 +143,12 @@ def _plan(script: Script, audio_path: str, work: Path) -> list[ClipSlot]:
 # ── FFmpeg helpers ───────────────────────────────────────────────────────────
 
 def _split_audio(audio_path: str, start: float, dur: float, out: Path) -> bool:
+    # Re-encode (not -c copy) so the output is a valid standalone MP3 with proper headers.
     cmd = [
         "ffmpeg", "-y", "-i", audio_path,
         "-ss", str(start), "-t", str(dur),
-        "-c", "copy", str(out),
+        "-acodec", "libmp3lame", "-q:a", "2",
+        str(out),
     ]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -334,13 +336,16 @@ async def _run_broll_slot(slot: ClipSlot) -> bool:
     fal_client.api_key = settings.fal_key
     raw = slot.out.with_suffix(".raw.mp4")
     try:
-        result = await fal_client.run_async(
-            settings.fal_video_model,
-            arguments={
-                "prompt": slot.prompt,
-                "duration": "10",
-                "aspect_ratio": "16:9",
-            },
+        result = await asyncio.wait_for(
+            fal_client.run_async(
+                settings.fal_video_model,
+                arguments={
+                    "prompt": slot.prompt,
+                    "duration": "10",
+                    "aspect_ratio": "16:9",
+                },
+            ),
+            timeout=900,  # 15 min hard cap per clip
         )
         async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.get(result["video"]["url"])

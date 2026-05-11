@@ -80,6 +80,7 @@ class PipelineRequest(BaseModel):
     demographic: Optional[str] = None
     skip_voice: bool = False
     skip_thumbnail: bool = False
+    skip_video: bool = False
     webhook_callback: Optional[str] = None
 
 
@@ -126,6 +127,7 @@ async def run_pipeline_job(job_id: str, request: PipelineRequest):
             demographic=request.demographic,
             skip_voice=request.skip_voice,
             skip_thumbnail=request.skip_thumbnail,
+            skip_video=request.skip_video,
         )
         result = {
             "status": "complete",
@@ -213,6 +215,7 @@ async def trigger_pipeline_sync(
             demographic=request.demographic,
             skip_voice=request.skip_voice,
             skip_thumbnail=request.skip_thumbnail,
+            skip_video=request.skip_video,
         )
         return {
             "status": "complete",

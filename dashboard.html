@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoboModal Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:      #050508;
+    --bg-base:      #0a0d14;
+    --bg-elevated:  #0f1420;
+    --surface:      rgba(255,255,255,0.03);
+    --surface-hover:rgba(255,255,255,0.055);
+    --border:       rgba(255,255,255,0.07);
+    --border-bright:rgba(255,255,255,0.13);
+    --fg:           #edeef2;
+    --fg-muted:     #7a8096;
+    --fg-dim:       #4a5068;
+    --blue:         #3b82f6;
+    --purple:       #8b5cf6;
+    --gradient:     linear-gradient(135deg, #3b82f6, #8b5cf6);
+    --gradient-glow:linear-gradient(135deg, rgba(59,130,246,0.35), rgba(139,92,246,0.35));
+    --amber:        #f59e0b;
+    --green:        #22c55e;
+    --red:          #ef4444;
+    --radius-sm:    8px;
+    --radius:       12px;
+    --radius-lg:    16px;
+    --ease:         cubic-bezier(0.16, 1, 0.3, 1);
+    --font:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html.light {
+    color-scheme: light;
+    --bg-deep:       #f1f5f9;
+    --bg-base:       #f8fafc;
+    --bg-elevated:   #ffffff;
+    --surface:       rgba(0,0,0,0.035);
+    --surface-hover: rgba(0,0,0,0.06);
+    --border:        rgba(0,0,0,0.08);
+    --border-bright: rgba(0,0,0,0.15);
+    --fg:            #0f172a;
+    --fg-muted:      #64748b;
+    --fg-dim:        #94a3b8;
+    --gradient-glow: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12));
+  }
+  html.light .blob { opacity: 0.035; }
+  html.light header { background: rgba(248,250,252,0.88); }
+
+  html { font-size: 16px; color-scheme: dark; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-base);
+    color: var(--fg);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Ambient blobs ─────────────────────────────── */
+  .blobs {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.07;
+    animation: drift 18s ease-in-out infinite;
+  }
+  .blob-1 { width: 500px; height: 500px; background: #3b82f6; top: -120px; left: -100px; animation-delay: 0s; }
+  .blob-2 { width: 400px; height: 400px; background: #8b5cf6; top: 30%; right: -80px; animation-delay: -6s; }
+  .blob-3 { width: 350px; height: 350px; background: #06b6d4; bottom: -80px; left: 35%; animation-delay: -11s; }
+
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%       { transform: translate(30px, -20px) scale(1.05); }
+    66%       { transform: translate(-20px, 25px) scale(0.97); }
+  }
+
+  /* ── Layout ────────────────────────────────────── */
+  .wrap { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ────────────────────────────────────── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,13,20,0.82);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; max-width: 1440px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 32px; height: 32px;
+    background: var(--gradient);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 16px rgba(59,130,246,0.4);
+  }
+  .brand-icon svg { width: 18px; height: 18px; }
+  .brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--fg-muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .health-pills { display: flex; gap: 8px; align-items: center; }
+  .pill {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 100px;
+    font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: all 0.2s var(--ease);
+    cursor: default;
+  }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .pill.ok   .pill-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .pill.err  .pill-dot { background: var(--red);   box-shadow: 0 0 6px var(--red);   }
+  .pill.chk  .pill-dot { background: var(--fg-dim); animation: pulse-dim 1s infinite; }
+  .pill.ok   { border-color: rgba(34,197,94,0.25); }
+  .pill.err  { border-color: rgba(239,68,68,0.25); }
+
+  @keyframes pulse-dim { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  .clock { font-size: 13px; font-weight: 600; color: var(--fg-muted); letter-spacing: 0.5px; font-variant-numeric: tabular-nums; }
+
+  /* ── Stats bar ─────────────────────────────────── */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .stat-cell {
+    background: var(--bg-base);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .stat-val { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+  .stat-lbl { font-size: 11px; color: var(--fg-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .stat-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-icon svg { width: 18px; height: 18px; }
+  .si-blue   { background: rgba(59,130,246,0.15); color: #3b82f6; }
+  .si-green  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+  .si-purple { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+  .si-amber  { background: rgba(245,158,11,0.12); color: #f59e0b; }
+
+  /* ── Main ──────────────────────────────────────── */
+  .main {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 56px - 57px - 52px);
+  }
+
+  /* ── Config Panel ──────────────────────────────── */
+  .config-panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .config-panel::-webkit-scrollbar { width: 4px; }
+  .config-panel::-webkit-scrollbar-track { background: transparent; }
+  .config-panel::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  .section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--fg-muted); margin-bottom: 10px;
+  }
+
+  /* ── Glass card ────────────────────────────────── */
+  .glass {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ── Model cards ───────────────────────────────── */
+  .model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .model-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    position: relative;
+    overflow: hidden;
+  }
+  .model-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--gradient-glow);
+    opacity: 0;
+    transition: opacity 0.2s var(--ease);
+  }
+  .model-card:hover { border-color: var(--border-bright); background: var(--surface-hover); }
+  .model-card:hover::before { opacity: 0.3; }
+  .model-card.selected {
+    border-color: transparent;
+    background: rgba(59,130,246,0.08);
+    box-shadow: 0 0 0 1.5px #3b82f6, 0 0 20px rgba(59,130,246,0.2), inset 0 0 20px rgba(59,130,246,0.04);
+  }
+  .model-card.selected::before { opacity: 0.4; }
+
+  .model-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 8px; font-size: 16px;
+    position: relative; z-index: 1;
+  }
+  .mi-blue   { background: rgba(59,130,246,0.2); }
+  .mi-purple { background: rgba(139,92,246,0.2); }
+  .mi-cyan   { background: rgba(6,182,212,0.2);  }
+  .mi-green  { background: rgba(34,197,94,0.15); }
+
+  .model-name { font-size: 12px; font-weight: 700; margin-bottom: 3px; position: relative; z-index: 1; }
+  .model-desc { font-size: 10px; color: var(--fg-muted); position: relative; z-index: 1; line-height: 1.4; }
+  .model-badge {
+    display: inline-block; font-size: 9px; font-weight: 700;
+    padding: 1px 6px; border-radius: 4px; margin-top: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    position: relative; z-index: 1;
+  }
+  .mb-blue   { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .mb-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+  .mb-cyan   { background: rgba(6,182,212,0.15); color: #22d3ee; }
+  .mb-green  { background: rgba(34,197,94,0.15); color: #4ade80; }
+
+  /* ── Pill selector ─────────────────────────────── */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sel-pill {
+    padding: 6px 12px; border-radius: 100px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    color: var(--fg-muted);
+  }
+  .sel-pill:hover { border-color: var(--border-bright); color: var(--fg); }
+  .sel-pill.selected {
+    border-color: #3b82f6;
+    background: rgba(59,130,246,0.12);
+    color: #93c5fd;
+    box-shadow: 0 0 10px rgba(59,130,246,0.15);
+  }
+
+  /* ── Text input ────────────────────────────────── */
+  .field-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-size: 12px; font-weight: 600; color: var(--fg-muted); }
+  .text-input {
+    width: 100%; padding: 10px 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    transition: all 0.18s var(--ease);
+    outline: none;
+  }
+  .text-input::placeholder { color: var(--fg-dim); }
+  .text-input:focus {
+    border-color: #3b82f6;
+    background: rgba(59,130,246,0.05);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  }
+
+  /* ── Niche chips ───────────────────────────────── */
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .chip {
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--fg-muted);
+    transition: all 0.15s var(--ease);
+  }
+  .chip:hover { border-color: var(--border-bright); color: var(--fg); }
+  .chip.active { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.4); color: #93c5fd; }
+
+  /* ── Toggle ────────────────────────────────────── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .toggle-info {}
+  .toggle-title { font-size: 13px; font-weight: 600; }
+  .toggle-sub { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+  .toggle-switch {
+    position: relative; width: 40px; height: 22px; flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--fg-muted);
+    left: 2px; top: 2px;
+    transition: all 0.2s var(--ease);
+  }
+  .toggle-switch input:checked + .toggle-slider {
+    background: rgba(59,130,246,0.3);
+    border-color: rgba(59,130,246,0.5);
+  }
+  .toggle-switch input:checked + .toggle-slider::before {
+    background: var(--blue);
+    transform: translateX(18px);
+    box-shadow: 0 0 8px rgba(59,130,246,0.5);
+  }
+
+  /* ── Range ─────────────────────────────────────── */
+  .range-wrap { display: flex; align-items: center; gap: 12px; }
+  input[type=range] {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 2px;
+    background: var(--border-bright);
+    outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--gradient);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(59,130,246,0.4);
+    transition: transform 0.15s var(--ease);
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  .range-val { font-size: 13px; font-weight: 700; color: #93c5fd; min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+
+  /* ── CTA Button ────────────────────────────────── */
+  .btn-generate {
+    width: 100%; padding: 15px;
+    background: var(--gradient);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    font-family: var(--font);
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    position: relative; overflow: hidden;
+    transition: all 0.2s var(--ease);
+    box-shadow: 0 4px 24px rgba(59,130,246,0.35);
+    letter-spacing: -0.2px;
+  }
+  .btn-generate::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: white; opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn-generate:hover::before { opacity: 0.08; }
+  .btn-generate:active { transform: scale(0.98); }
+  .btn-generate:disabled {
+    opacity: 0.55; cursor: not-allowed; transform: none;
+    box-shadow: none;
+  }
+  .btn-generate .btn-inner { display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; z-index: 1; }
+  .btn-spinner {
+    width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  .btn-generate.loading .btn-spinner { display: block; }
+  .btn-generate.loading .btn-text { opacity: 0.7; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Jobs Panel ────────────────────────────────── */
+  .jobs-panel { overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .jobs-panel::-webkit-scrollbar { width: 4px; }
+  .jobs-panel::-webkit-scrollbar-track { background: transparent; }
+  .jobs-panel::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  .jobs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .jobs-title { font-size: 14px; font-weight: 700; }
+  .btn-refresh {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px; border-radius: var(--radius-sm);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--fg-muted); font-family: var(--font); font-size: 12px;
+    cursor: pointer; transition: all 0.18s var(--ease);
+    font-weight: 500;
+  }
+  .btn-refresh:hover { border-color: var(--border-bright); color: var(--fg); }
+  .btn-refresh svg { width: 13px; height: 13px; }
+  #theme-btn:hover { border-color: var(--border-bright) !important; color: var(--fg) !important; }
+
+  /* ── Job Card ──────────────────────────────────── */
+  .job-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    transition: all 0.25s var(--ease);
+    cursor: default;
+  }
+  .job-card:hover { border-color: var(--border-bright); background: var(--surface-hover); }
+  .job-card.running {
+    border-color: rgba(59,130,246,0.3);
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.1), 0 0 20px rgba(59,130,246,0.06);
+    animation: running-pulse 2.5s ease-in-out infinite;
+  }
+  .job-card.complete { border-color: rgba(34,197,94,0.2); }
+  .job-card.failed   { border-color: rgba(239,68,68,0.2);  }
+
+  @keyframes running-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(59,130,246,0.1), 0 0 20px rgba(59,130,246,0.06); }
+    50%       { box-shadow: 0 0 0 1px rgba(59,130,246,0.25), 0 0 30px rgba(59,130,246,0.14); }
+  }
+
+  .job-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .job-id-wrap {}
+  .job-id { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .job-title { font-size: 14px; font-weight: 700; margin-top: 2px; line-height: 1.3; }
+  .job-topic { font-size: 12px; color: var(--fg-muted); margin-top: 3px; }
+
+  .status-badge {
+    flex-shrink: 0; display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 100px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .sb-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-queued  { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+  .status-queued  .sb-dot { background: #f59e0b; }
+  .status-running { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .status-running .sb-dot { background: #3b82f6; animation: sb-pulse 1s ease-in-out infinite; }
+  .status-complete{ background: rgba(34,197,94,0.1);  color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+  .status-complete.sb-dot { background: #22c55e; }
+  .status-failed  { background: rgba(239,68,68,0.1);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .status-failed  .sb-dot { background: #ef4444; }
+
+  @keyframes sb-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+
+  /* ── Job meta strip ────────────────────────────── */
+  .job-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .job-meta-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--fg-muted); }
+  .job-meta-item svg { width: 13px; height: 13px; opacity: 0.6; }
+  .job-meta-item strong { color: var(--fg); font-weight: 600; }
+
+  /* ── Tags ──────────────────────────────────────── */
+  .tags-wrap { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+  .tag {
+    padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    background: rgba(139,92,246,0.12); color: #c4b5fd;
+    border: 1px solid rgba(139,92,246,0.2);
+  }
+
+  /* ── Timing bars ───────────────────────────────── */
+  .timings-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .timings-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--fg-dim); margin-bottom: 8px; }
+  .timing-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .timing-name { font-size: 10px; font-weight: 600; color: var(--fg-muted); width: 80px; flex-shrink: 0; }
+  .timing-bar-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .timing-bar { height: 100%; border-radius: 2px; transition: width 0.6s var(--ease); }
+  .tb-research  { background: #3b82f6; }
+  .tb-script    { background: #8b5cf6; }
+  .tb-seo       { background: #06b6d4; }
+  .tb-voice     { background: #f59e0b; }
+  .tb-thumbnail { background: #ec4899; }
+  .tb-video     { background: #22c55e; }
+  .timing-val { font-size: 10px; font-weight: 700; color: var(--fg-muted); width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Progress bar ──────────────────────────────── */
+  .progress-track {
+    width: 100%; height: 3px;
+    background: var(--border);
+    border-radius: 2px; overflow: hidden;
+    margin-top: 10px;
+  }
+  .progress-fill {
+    height: 100%; background: var(--gradient);
+    border-radius: 2px;
+    animation: progress-indeterminate 1.8s ease-in-out infinite;
+  }
+  @keyframes progress-indeterminate {
+    0%   { transform: translateX(-100%) scaleX(0.5); }
+    50%  { transform: translateX(0%)    scaleX(0.8); }
+    100% { transform: translateX(100%)  scaleX(0.5); }
+  }
+
+  /* ── Empty state ───────────────────────────────── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 24px; color: var(--fg-dim); text-align: center;
+    border: 1px dashed var(--border); border-radius: var(--radius-lg);
+  }
+  .empty-state svg { width: 40px; height: 40px; opacity: 0.3; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; font-weight: 500; }
+  .empty-state small { font-size: 12px; margin-top: 4px; color: var(--fg-dim); }
+
+  /* ── Divider ───────────────────────────────────── */
+  .divider { height: 1px; background: var(--border); }
+
+  /* ── Content model row ─────────────────────────── */
+  .model-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .lil-card {
+    padding: 10px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.18s var(--ease);
+  }
+  .lil-card:hover { border-color: var(--border-bright); background: var(--surface-hover); }
+  .lil-card.selected {
+    border-color: #8b5cf6;
+    background: rgba(139,92,246,0.08);
+    box-shadow: 0 0 12px rgba(139,92,246,0.15);
+  }
+  .lil-card-name { font-size: 11px; font-weight: 700; }
+  .lil-card-sub  { font-size: 10px; color: var(--fg-dim); margin-top: 2px; }
+
+  /* ── Toast ─────────────────────────────────────── */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    padding: 12px 16px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 600;
+    animation: toast-in 0.25s var(--ease) forwards;
+    max-width: 320px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast-success { background: rgba(34,197,94,0.15);  border: 1px solid rgba(34,197,94,0.35);  color: #4ade80; }
+  .toast-error   { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.35);  color: #f87171; }
+  .toast-info    { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35); color: #93c5fd; }
+  .toast-out { animation: toast-out 0.2s var(--ease) forwards; }
+  @keyframes toast-in  { from { opacity:0; transform:translateY(12px) scale(0.96); } to { opacity:1; transform:none; } }
+  @keyframes toast-out { to   { opacity:0; transform:translateY(4px); } }
+
+  /* ── Responsive ────────────────────────────────── */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .config-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .health-pills { display: none; }
+    .model-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 480px) {
+    .header-inner { padding: 12px 16px; }
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+    .model-grid { grid-template-columns: 1fr; }
+    .main { padding: 0; }
+  }
+
+  /* ── Reduced motion ────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .btn-spinner, .progress-fill, .sb-dot, .job-card.running { animation: none !important; }
+    * { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- ── Header ── -->
+<header role="banner">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">RoboModal Studio</div>
+        <div class="brand-sub">AI Content Engine</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button id="theme-btn" onclick="toggleTheme()" aria-label="Toggle light/dark mode" style="
+        display:flex;align-items:center;gap:6px;
+        padding:6px 12px;border-radius:var(--radius-sm);
+        background:var(--surface);border:1px solid var(--border);
+        color:var(--fg-muted);font-family:var(--font);font-size:12px;
+        cursor:pointer;transition:all 0.18s var(--ease);font-weight:500;
+      ">
+        <svg id="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <span id="theme-label">Light</span>
+      </button>
+      <div class="health-pills" id="health-pills" role="status" aria-label="Provider status">
+        <div class="pill chk" id="pill-openai"><span class="pill-dot"></span>OpenAI</div>
+        <div class="pill chk" id="pill-groq"><span class="pill-dot"></span>Groq</div>
+        <div class="pill chk" id="pill-fal"><span class="pill-dot"></span>fal.ai</div>
+      </div>
+      <div class="clock" id="clock" aria-live="off">--:--:--</div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Stats bar ── -->
+<div class="stats-bar" role="region" aria-label="Statistics">
+  <div class="stat-cell">
+    <div class="stat-icon si-blue">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+    </div>
+    <div><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">Videos Generated</div></div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-icon si-green">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <div><div class="stat-val" id="stat-success">—</div><div class="stat-lbl">Success Rate</div></div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-icon si-purple">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div><div class="stat-val" id="stat-avg">—</div><div class="stat-lbl">Avg Gen Time</div></div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-icon si-amber">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    </div>
+    <div><div class="stat-val" id="stat-running">0</div><div class="stat-lbl">Running Now</div></div>
+  </div>
+</div>
+
+<!-- ── Main Layout ── -->
+<div class="main">
+
+  <!-- ── Config Panel ── -->
+  <aside class="config-panel" role="complementary" aria-label="Pipeline configuration">
+
+    <!-- Video Model -->
+    <div>
+      <div class="section-label">Video Generation Model</div>
+      <div class="model-grid" role="group" aria-label="Video model selection">
+        <div class="model-card selected" data-model="fal-ai/kling-video/v2/master/text-to-video" onclick="selectModel(this,'video')" role="radio" aria-checked="true" tabindex="0">
+          <div class="model-icon mi-blue">🎬</div>
+          <div class="model-name">Kling v2 Master</div>
+          <div class="model-desc">Highest quality cinematic output</div>
+          <div class="model-badge mb-blue">Default</div>
+        </div>
+        <div class="model-card" data-model="fal-ai/seedance-v1/image-to-video" onclick="selectModel(this,'video')" role="radio" aria-checked="false" tabindex="0">
+          <div class="model-icon mi-purple">💃</div>
+          <div class="model-name">Seedance</div>
+          <div class="model-desc">Fast, stylized motion</div>
+          <div class="model-badge mb-purple">Fast</div>
+        </div>
+        <div class="model-card" data-model="fal-ai/wan-t2v" onclick="selectModel(this,'video')" role="radio" aria-checked="false" tabindex="0">
+          <div class="model-icon mi-cyan">🎨</div>
+          <div class="model-name">Wan T2V</div>
+          <div class="model-desc">Artistic, dreamlike visuals</div>
+          <div class="model-badge mb-cyan">Creative</div>
+        </div>
+        <div class="model-card" data-model="fal-ai/minimax-video" onclick="selectModel(this,'video')" role="radio" aria-checked="false" tabindex="0">
+          <div class="model-icon mi-green">📸</div>
+          <div class="model-name">MiniMax</div>
+          <div class="model-desc">Photorealistic generation</div>
+          <div class="model-badge mb-green">Realistic</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content Model -->
+    <div>
+      <div class="section-label">Script & Content Model</div>
+      <div class="model-row" role="group" aria-label="Content model selection">
+        <div class="lil-card selected" data-model="gpt-4o" onclick="selectModel(this,'content')" role="radio" aria-checked="true" tabindex="0">
+          <div class="lil-card-name">GPT-4o</div>
+          <div class="lil-card-sub">Best quality</div>
+        </div>
+        <div class="lil-card" data-model="gpt-4o-mini" onclick="selectModel(this,'content')" role="radio" aria-checked="false" tabindex="0">
+          <div class="lil-card-name">GPT-4o mini</div>
+          <div class="lil-card-sub">Faster · cheaper</div>
+        </div>
+        <div class="lil-card" data-model="llama-3.3-70b-versatile" onclick="selectModel(this,'content')" role="radio" aria-checked="false" tabindex="0">
+          <div class="lil-card-name">Llama 3.3</div>
+          <div class="lil-card-sub">Groq · fastest</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Length -->
+    <div>
+      <div class="section-label">Target Video Length</div>
+      <div class="pill-row" role="group" aria-label="Video length">
+        <div class="sel-pill" data-val="short" onclick="selectPill(this,'length')" role="radio" aria-checked="false" tabindex="0">Short · 2–3 min</div>
+        <div class="sel-pill selected" data-val="medium" onclick="selectPill(this,'length')" role="radio" aria-checked="true" tabindex="0">Medium · 5–7 min</div>
+        <div class="sel-pill" data-val="long" onclick="selectPill(this,'length')" role="radio" aria-checked="false" tabindex="0">Long · 10–12 min</div>
+      </div>
+    </div>
+
+    <!-- Topic / Niche -->
+    <div>
+      <div class="field-wrap">
+        <label class="field-label" for="topic-input">Topic / Niche Override</label>
+        <input id="topic-input" class="text-input" type="text" placeholder="e.g. 5 ways to pay off debt faster" aria-label="Custom topic or niche" autocomplete="off">
+      </div>
+      <div class="chip-grid" role="group" aria-label="Preset niches">
+        <div class="chip" onclick="setNiche('Personal Finance')" tabindex="0">Personal Finance</div>
+        <div class="chip" onclick="setNiche('Tech')" tabindex="0">Tech</div>
+        <div class="chip" onclick="setNiche('Health & Wellness')" tabindex="0">Health & Wellness</div>
+        <div class="chip" onclick="setNiche('Self-Improvement')" tabindex="0">Self-Improvement</div>
+        <div class="chip" onclick="setNiche('Crypto')" tabindex="0">Crypto</div>
+        <div class="chip" onclick="setNiche('AI & Future')" tabindex="0">AI & Future</div>
+        <div class="chip" onclick="setNiche('Business')" tabindex="0">Business</div>
+        <div class="chip" onclick="setNiche('Travel')" tabindex="0">Travel</div>
+      </div>
+    </div>
+
+    <!-- Tone -->
+    <div>
+      <div class="section-label">Tone</div>
+      <div class="pill-row" role="group" aria-label="Tone selection">
+        <div class="sel-pill selected" data-val="authoritative" onclick="selectPill(this,'tone')" role="radio" aria-checked="true" tabindex="0">Authoritative</div>
+        <div class="sel-pill" data-val="casual" onclick="selectPill(this,'tone')" role="radio" aria-checked="false" tabindex="0">Casual</div>
+        <div class="sel-pill" data-val="educational" onclick="selectPill(this,'tone')" role="radio" aria-checked="false" tabindex="0">Educational</div>
+        <div class="sel-pill" data-val="energetic" onclick="selectPill(this,'tone')" role="radio" aria-checked="false" tabindex="0">Energetic</div>
+        <div class="sel-pill" data-val="calm" onclick="selectPill(this,'tone')" role="radio" aria-checked="false" tabindex="0">Calm & Mindful</div>
+        <div class="sel-pill" data-val="storytelling" onclick="selectPill(this,'tone')" role="radio" aria-checked="false" tabindex="0">Storytelling</div>
+      </div>
+    </div>
+
+    <!-- Demographic -->
+    <div>
+      <div class="field-wrap">
+        <label class="field-label" for="demo-input">Target Demographic</label>
+        <input id="demo-input" class="text-input" type="text" value="25-45 year old professionals" aria-label="Target demographic">
+      </div>
+      <div class="chip-grid" role="group" aria-label="Demographic presets" style="margin-top:8px;">
+        <div class="chip" onclick="setDemo('18-24 Gen Z')" tabindex="0">Gen Z · 18–24</div>
+        <div class="chip" onclick="setDemo('25-40 Millennials')" tabindex="0">Millennials · 25–40</div>
+        <div class="chip" onclick="setDemo('41-55 Gen X')" tabindex="0">Gen X · 41–55</div>
+        <div class="chip" onclick="setDemo('all ages broad audience')" tabindex="0">Broad · All ages</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Toggles -->
+    <div class="glass" style="padding:12px 16px;">
+      <div class="section-label" style="margin-bottom:4px;">Pipeline Stages</div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-title">Skip Voice</div>
+          <div class="toggle-sub">Bypass TTS generation</div>
+        </div>
+        <label class="toggle-switch" aria-label="Skip voice generation">
+          <input type="checkbox" id="skip-voice">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-title">Skip Thumbnail</div>
+          <div class="toggle-sub">Skip fal.ai Flux render</div>
+        </div>
+        <label class="toggle-switch" aria-label="Skip thumbnail generation">
+          <input type="checkbox" id="skip-thumbnail">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-title">Skip Video</div>
+          <div class="toggle-sub">Skip B-roll assembly</div>
+        </div>
+        <label class="toggle-switch" aria-label="Skip video assembly">
+          <input type="checkbox" id="skip-video">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Batch Mode -->
+    <div class="glass" style="padding:12px 16px;">
+      <div class="section-label" style="margin-bottom:6px;">Batch Mode</div>
+      <div class="toggle-row" style="padding:0 0 8px;">
+        <div class="toggle-info">
+          <div class="toggle-title">Batch Run</div>
+          <div class="toggle-sub">Generate multiple videos in parallel</div>
+        </div>
+        <label class="toggle-switch" aria-label="Enable batch mode">
+          <input type="checkbox" id="batch-toggle" onchange="toggleBatch(this)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="batch-controls" style="display:none; padding-top:8px; border-top:1px solid var(--border);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="font-size:12px; color:var(--fg-muted);">Number of videos</span>
+          <span id="batch-val" style="font-size:13px; font-weight:700; color:#93c5fd;">3</span>
+        </div>
+        <div class="range-wrap">
+          <input type="range" id="batch-count" min="2" max="5" value="3" oninput="document.getElementById('batch-val').textContent=this.value" aria-label="Batch count">
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <button class="btn-generate" id="generate-btn" onclick="generateVideo()" aria-label="Generate video">
+      <div class="btn-inner">
+        <div class="btn-spinner" aria-hidden="true"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span class="btn-text">Generate Video</span>
+      </div>
+    </button>
+
+  </aside>
+
+  <!-- ── Jobs Panel ── -->
+  <main class="jobs-panel" role="main" aria-label="Jobs feed" id="jobs-panel">
+    <div class="jobs-header">
+      <div class="jobs-title">Live Jobs Feed</div>
+      <button class="btn-refresh" onclick="loadAllJobs()" aria-label="Refresh jobs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div id="jobs-list">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+        <p>No jobs yet</p>
+        <small>Configure your pipeline and hit Generate</small>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" aria-live="polite" aria-label="Notifications"></div>
+
+<script>
+'use strict';
+
+/* ─── Theme ─────────────────────────────────────────── */
+const SUN_SVG  = '<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="5"/>';
+const MOON_SVG = '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('light');
+  document.getElementById('theme-icon').innerHTML = isLight ? SUN_SVG : MOON_SVG;
+  document.getElementById('theme-label').textContent = isLight ? 'Dark' : 'Light';
+  localStorage.setItem('rm-theme', isLight ? 'light' : 'dark');
+}
+
+// Persist preference
+(function() {
+  const saved = localStorage.getItem('rm-theme');
+  if (saved === 'light') {
+    document.documentElement.classList.add('light');
+    // Icons patched after DOM is ready
+  }
+})();
+
+/* ─── State ─────────────────────────────────────────── */
+const state = {
+  videoModel:   'fal-ai/kling-video/v2/master/text-to-video',
+  contentModel: 'gpt-4o',
+  length:       'medium',
+  tone:         'authoritative',
+  pollers:      {},         // jobId → intervalId
+  allJobs:      {},         // jobId → data
+  generatingCount: 0,
+};
+
+const API = 'http://localhost:8000';
+
+/* ─── Clock ─────────────────────────────────────────── */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Restore theme icon state after DOM ready
+if (document.documentElement.classList.contains('light')) {
+  document.getElementById('theme-icon').innerHTML = SUN_SVG;
+  document.getElementById('theme-label').textContent = 'Dark';
+}
+
+/* ─── Health check ──────────────────────────────────── */
+async function fetchHealth() {
+  const pillMap = { openai: 'pill-openai', groq: 'pill-groq', fal: 'pill-fal' };
+  try {
+    const res = await fetch(`${API}/health`, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    const providers = data.providers || {};
+    for (const [key, elId] of Object.entries(pillMap)) {
+      const el = document.getElementById(elId);
+      const val = providers[key] || '';
+      const ok = val === 'ok' || val === 'configured';
+      el.className = 'pill ' + (ok ? 'ok' : 'err');
+    }
+  } catch {
+    for (const elId of Object.values(pillMap)) {
+      const el = document.getElementById(elId);
+      el.className = 'pill err';
+    }
+  }
+}
+fetchHealth();
+setInterval(fetchHealth, 30000);
+
+/* ─── Model selection ───────────────────────────────── */
+function selectModel(el, group) {
+  const parent = el.parentElement;
+  parent.querySelectorAll('.model-card, .lil-card').forEach(c => {
+    c.classList.remove('selected');
+    c.setAttribute('aria-checked', 'false');
+  });
+  el.classList.add('selected');
+  el.setAttribute('aria-checked', 'true');
+  if (group === 'video') state.videoModel = el.dataset.model;
+  else state.contentModel = el.dataset.model;
+}
+
+function selectPill(el, group) {
+  const parent = el.parentElement;
+  parent.querySelectorAll('.sel-pill').forEach(p => {
+    p.classList.remove('selected');
+    p.setAttribute('aria-checked', 'false');
+  });
+  el.classList.add('selected');
+  el.setAttribute('aria-checked', 'true');
+  if (group === 'length') state.length = el.dataset.val;
+  else if (group === 'tone') state.tone = el.dataset.val;
+}
+
+/* ─── Keyboard support for cards / pills ─────────────── */
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.onclick) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
+
+/* ─── Niche / Demo shortcuts ────────────────────────── */
+function setNiche(val) {
+  const inp = document.getElementById('topic-input');
+  inp.value = val;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  inp.focus();
+}
+function setDemo(val) {
+  document.getElementById('demo-input').value = val;
+}
+
+/* ─── Batch toggle ──────────────────────────────────── */
+function toggleBatch(el) {
+  document.getElementById('batch-controls').style.display = el.checked ? 'block' : 'none';
+}
+
+/* ─── Generate ──────────────────────────────────────── */
+async function generateVideo() {
+  const btn = document.getElementById('generate-btn');
+  if (btn.disabled) return;
+
+  const niche    = document.getElementById('topic-input').value.trim() || null;
+  const demo     = document.getElementById('demo-input').value.trim() || null;
+  const skipVoice = document.getElementById('skip-voice').checked;
+  const skipThumb = document.getElementById('skip-thumbnail').checked;
+  const skipVideo = document.getElementById('skip-video').checked;
+  const isBatch  = document.getElementById('batch-toggle').checked;
+  const batchCnt = parseInt(document.getElementById('batch-count').value);
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.querySelector('.btn-text').textContent = isBatch ? `Queuing ${batchCnt} videos…` : 'Queuing…';
+  btn.querySelector('.btn-icon').style.display = 'none';
+
+  try {
+    if (isBatch) {
+      const res = await fetch(`${API}/run/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          count: batchCnt,
+          niche, tone: state.tone, demographic: demo,
+          skip_voice: skipVoice, skip_thumbnail: skipThumb,
+        }),
+      });
+      const data = await res.json();
+      toast(`Batch queued: ${batchCnt} videos (${data.batch_id})`, 'info');
+      setTimeout(loadAllJobs, 800);
+    } else {
+      const res = await fetch(`${API}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche, tone: state.tone, demographic: demo,
+          skip_voice: skipVoice, skip_thumbnail: skipThumb,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Request failed');
+      toast(`Job started: ${data.job_id}`, 'success');
+      injectJobCard(data.job_id, { status: 'queued' });
+      startPolling(data.job_id);
+    }
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.querySelector('.btn-text').textContent = 'Generate Video';
+    btn.querySelector('.btn-icon').style.display = '';
+  }
+}
+
+/* ─── Job polling ───────────────────────────────────── */
+function startPolling(jobId) {
+  if (state.pollers[jobId]) return;
+  state.pollers[jobId] = setInterval(async () => {
+    try {
+      const res  = await fetch(`${API}/jobs/${jobId}`, { signal: AbortSignal.timeout(5000) });
+      const data = await res.json();
+      state.allJobs[jobId] = data;
+      renderJobCard(jobId, data);
+      updateStats();
+      const done = data.status === 'complete' || data.status === 'failed';
+      if (done) {
+        clearInterval(state.pollers[jobId]);
+        delete state.pollers[jobId];
+        if (data.status === 'complete') toast(`Done: ${data.title || jobId}`, 'success');
+        else toast(`Job failed: ${jobId}`, 'error');
+      }
+    } catch { /* network hiccup, retry next tick */ }
+  }, 3000);
+}
+
+/* ─── Load all jobs ─────────────────────────────────── */
+async function loadAllJobs() {
+  try {
+    const res  = await fetch(`${API}/jobs`, { signal: AbortSignal.timeout(6000) });
+    const data = await res.json();
+    const jobs = data.jobs || {};
+    state.allJobs = { ...jobs };
+
+    const list = document.getElementById('jobs-list');
+    if (Object.keys(jobs).length === 0) {
+      list.innerHTML = emptyState();
+      return;
+    }
+    list.innerHTML = '';
+    // Sort: running first, then by creation (newest first — keys are already ordered DESC from API)
+    const sorted = Object.entries(jobs).sort(([,a],[,b]) => {
+      const rank = s => s === 'running' ? 0 : s === 'queued' ? 1 : 2;
+      return rank(a.status) - rank(b.status);
+    });
+    for (const [jobId, jobData] of sorted) {
+      injectJobCard(jobId, jobData);
+      if (jobData.status === 'running' || jobData.status === 'queued') {
+        startPolling(jobId);
+      }
+    }
+    updateStats();
+  } catch {
+    toast('Could not reach API — is the server running?', 'error');
+  }
+}
+loadAllJobs();
+
+/* ─── Inject or update job card ────────────────────── */
+function injectJobCard(jobId, data) {
+  const list = document.getElementById('jobs-list');
+  // Remove empty state if present
+  const empty = list.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  let card = document.getElementById(`job-${jobId}`);
+  if (!card) {
+    card = document.createElement('div');
+    card.id = `job-${jobId}`;
+    list.prepend(card);
+  }
+  card.outerHTML = buildJobCard(jobId, data);
+  // Re-query since outerHTML replaced the node
+}
+
+function renderJobCard(jobId, data) {
+  const card = document.getElementById(`job-${jobId}`);
+  if (!card) { injectJobCard(jobId, data); return; }
+  const newHtml = buildJobCard(jobId, data);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = newHtml;
+  const newCard = tmp.firstElementChild;
+  card.replaceWith(newCard);
+}
+
+function buildJobCard(jobId, data) {
+  const { status = 'queued', title, topic, word_count, duration_min, tags = [], stage_timings = {}, error } = data;
+  const shortId = jobId.replace('job_','').substring(0,8);
+
+  const statusHtml = `<div class="status-badge status-${status}">
+    <div class="sb-dot"></div>
+    ${status.charAt(0).toUpperCase() + status.slice(1)}
+  </div>`;
+
+  let bodyHtml = '';
+
+  if (status === 'running' || status === 'queued') {
+    bodyHtml = `<div class="progress-track"><div class="progress-fill"></div></div>
+    <div style="font-size:11px;color:var(--fg-dim);margin-top:8px;">${status === 'queued' ? 'Waiting in queue…' : 'Generating content…'}</div>`;
+  }
+
+  if (status === 'complete' && (title || topic)) {
+    const metaItems = [];
+    if (word_count)    metaItems.push(`<div class="job-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><strong>${word_count.toLocaleString()}</strong> words</div>`);
+    if (duration_min)  metaItems.push(`<div class="job-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>${Number(duration_min).toFixed(1)}</strong> min</div>`);
+
+    const tagsHtml = tags.length ? `<div class="tags-wrap">${tags.slice(0,8).map(t => `<div class="tag">${esc(t)}</div>`).join('')}</div>` : '';
+    const timingsHtml = buildTimings(stage_timings);
+
+    bodyHtml = `
+      ${metaItems.length ? `<div class="job-meta">${metaItems.join('')}</div>` : ''}
+      ${tagsHtml}
+      ${timingsHtml}`;
+  }
+
+  if (status === 'failed') {
+    bodyHtml = `<div style="font-size:12px;color:var(--red);margin-top:8px;">${esc(error || 'Unknown error')}</div>`;
+  }
+
+  return `<div id="job-${jobId}" class="job-card ${status}" role="article" aria-label="Job ${shortId}">
+    <div class="job-top">
+      <div class="job-id-wrap">
+        <div class="job-id">${esc(jobId)}</div>
+        ${title ? `<div class="job-title">${esc(title)}</div>` : `<div class="job-title" style="color:var(--fg-muted);">Generating…</div>`}
+        ${topic ? `<div class="job-topic">${esc(topic)}</div>` : ''}
+      </div>
+      ${statusHtml}
+    </div>
+    ${bodyHtml}
+  </div>`;
+}
+
+function buildTimings(timings) {
+  if (!timings || !Object.keys(timings).length) return '';
+  const max = Math.max(...Object.values(timings), 1);
+  const colorMap = { research:'tb-research', script:'tb-script', seo_affiliates:'tb-seo', voice:'tb-voice', thumbnail:'tb-thumbnail', video:'tb-video' };
+  const labelMap = { research:'Research', script:'Script', seo_affiliates:'SEO', voice:'Voice', thumbnail:'Thumbnail', video:'Video' };
+  const rows = Object.entries(timings).map(([k, v]) => `
+    <div class="timing-row">
+      <div class="timing-name">${labelMap[k] || k}</div>
+      <div class="timing-bar-wrap"><div class="timing-bar ${colorMap[k] || 'tb-research'}" style="width:${(v/max*100).toFixed(1)}%"></div></div>
+      <div class="timing-val">${v}s</div>
+    </div>`).join('');
+  return `<div class="timings-section"><div class="timings-label">Stage Timings</div>${rows}</div>`;
+}
+
+/* ─── Stats ─────────────────────────────────────────── */
+function updateStats() {
+  const jobs = Object.values(state.allJobs);
+  const total    = jobs.filter(j => j.status === 'complete').length;
+  const failed   = jobs.filter(j => j.status === 'failed').length;
+  const running  = jobs.filter(j => j.status === 'running' || j.status === 'queued').length;
+  const done     = total + failed;
+  const rate     = done > 0 ? Math.round(total / done * 100) : null;
+
+  const allTimings = jobs.filter(j => j.stage_timings && Object.keys(j.stage_timings).length > 0)
+    .map(j => Object.values(j.stage_timings).reduce((a,b) => a+b, 0));
+  const avgTime = allTimings.length > 0 ? Math.round(allTimings.reduce((a,b) => a+b, 0) / allTimings.length) : null;
+
+  document.getElementById('stat-total').textContent   = total;
+  document.getElementById('stat-success').textContent = rate !== null ? `${rate}%` : '—';
+  document.getElementById('stat-avg').textContent     = avgTime !== null ? `${avgTime}s` : '—';
+  document.getElementById('stat-running').textContent = running;
+}
+
+/* ─── Toast ─────────────────────────────────────────── */
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.setAttribute('role', 'status');
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('toast-out');
+    setTimeout(() => el.remove(), 220);
+  }, 4000);
+}
+
+/* ─── Helpers ───────────────────────────────────────── */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function emptyState() {
+  return `<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+    <p>No jobs yet</p>
+    <small>Configure your pipeline and hit Generate</small>
+  </div>`;
+}
+</script>
+</body>
+</html>
