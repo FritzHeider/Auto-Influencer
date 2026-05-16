@@ -214,13 +214,22 @@ async def generate_voiceover(
     tone: str,
     demographic: str,
     video_id: str,
+    voice_id_override: str | None = None,
 ) -> tuple[VoiceSpec, str]:
     """Full voiceover pipeline: spec selection → generation → post-processing."""
     audio_dir = Path(settings.audio_dir)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    voice_spec = await select_voice_spec(niche, tone, demographic, script.estimated_duration_minutes)
-    logger.info(f"Selected voice: {voice_spec.voice_name} via {voice_spec.provider}")
+    if voice_id_override:
+        voice_spec = VoiceSpec(
+            provider="openai",
+            voice_id=voice_id_override,
+            voice_name=voice_id_override,
+        )
+        logger.info(f"Using voice override: {voice_id_override}")
+    else:
+        voice_spec = await select_voice_spec(niche, tone, demographic, script.estimated_duration_minutes)
+        logger.info(f"Selected voice: {voice_spec.voice_name} via {voice_spec.provider}")
 
     clean_text = strip_script_markup(script.full_text)
     raw_path = audio_dir / f"{video_id}_raw.mp3"

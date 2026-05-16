@@ -46,6 +46,19 @@ async def run_pipeline(
     skip_voice: bool = False,
     skip_thumbnail: bool = False,
     skip_video: bool = False,
+    scene_style: str | None = None,
+    thumbnail_model: str | None = None,
+    avatar_id: str | None = None,
+    avatar_model: str | None = None,
+    voice_id: str | None = None,
+    style_locked_broll: bool = False,
+    video_model: str | None = None,
+    reference_image_id: str | None = None,
+    use_native_audio: bool = False,
+    transition: str = "cut",
+    card_style: str = "pillow",
+    cinematic_style: str | None = None,
+    reference_all_clips: bool = False,
 ) -> VideoPackage:
     """
     Run the full AI influencer content pipeline.
@@ -102,7 +115,9 @@ async def run_pipeline(
     if not skip_voice:
         logger.info("Stage 4/5: Voice generation (OpenAI TTS → ElevenLabs fallback)")
         t0 = time.monotonic()
-        voice_spec, audio_path = await generate_voiceover(script, niche, tone, demographic, video_id)
+        voice_spec, audio_path = await generate_voiceover(
+            script, niche, tone, demographic, video_id, voice_id_override=voice_id
+        )
         timings["voice"] = round(time.monotonic() - t0, 2)
     else:
         logger.info("Stage 4/5: Skipped (skip_voice=True)")
@@ -121,7 +136,7 @@ async def run_pipeline(
         logger.info("Stage 5/5: Thumbnail generation (fal.ai Flux)")
         t0 = time.monotonic()
         thumbnail_concepts, winning_thumbnail, thumbnail_path = await generate_thumbnail(
-            script, seo, niche, video_id
+            script, seo, niche, video_id, thumbnail_model=thumbnail_model
         )
         timings["thumbnail"] = round(time.monotonic() - t0, 2)
     else:
@@ -145,7 +160,20 @@ async def run_pipeline(
     if not skip_video and audio_path:
         logger.info("Stage 6/6: Video assembly (fal.ai Kling B-roll + ffmpeg)")
         t0 = time.monotonic()
-        video_path = await generate_video(script, audio_path, video_id)
+        video_path = await generate_video(
+            script, audio_path, video_id,
+            scene_style=scene_style,
+            avatar_id=avatar_id,
+            avatar_model=avatar_model,
+            style_locked_broll=style_locked_broll,
+            video_model=video_model,
+            reference_image_id=reference_image_id,
+            use_native_audio=use_native_audio,
+            transition=transition,
+            card_style=card_style,
+            cinematic_style=cinematic_style,
+            reference_all_clips=reference_all_clips,
+        )
         timings["video"] = round(time.monotonic() - t0, 2)
         if video_path:
             logger.info(f"Video assembled: {video_path}")

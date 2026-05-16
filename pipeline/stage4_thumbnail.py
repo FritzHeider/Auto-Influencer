@@ -46,25 +46,34 @@ async def generate_thumbnail_concepts(
     return concepts
 
 
-async def render_thumbnail_fal(concept: ThumbnailConcept, output_path: Path) -> bool:
+async def render_thumbnail_fal(
+    concept: ThumbnailConcept,
+    output_path: Path,
+    thumbnail_model: str | None = None,
+) -> bool:
     """Render winning thumbnail concept via fal.ai Flux."""
     fal_client.api_key = settings.fal_key
+    model = thumbnail_model or settings.fal_model
+    is_pro = model in (settings.fal_thumbnail_pro_model, settings.fal_thumbnail_ultra_model)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     async def _render():
-        result = await fal_client.run_async(
-            settings.fal_model,
-            arguments={
-                "prompt": concept.image_prompt,
-                "negative_prompt": "text, watermark, logo, human face, person, nsfw, blurry, low quality",
-                "image_size": {"width": 1344, "height": 768},
-                "num_inference_steps": 28,
-                "guidance_scale": 3.5,
-                "num_images": 1,
-                "output_format": "jpeg",
-                "enable_safety_checker": False,
-            },
-        )
+        args: dict = {
+            "prompt": concept.image_prompt,
+            "num_images": 1,
+            "output_format": "jpeg",
+        }
+        if is_pro:
+            args["aspect_ratio"] = "16:9"
+            args["safety_tolerance"] = "5"
+        else:
+            args["negative_prompt"] = "text, watermark, logo, human face, person, nsfw, blurry, low quality"
+            args["image_size"] = {"width": 1344, "height": 768}
+            args["num_inference_steps"] = 28
+            args["guidance_scale"] = 3.5
+            args["enable_safety_checker"] = False
+
+        result = await fal_client.run_async(model, arguments=args)
         image_url = result["images"][0]["url"]
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.get(image_url)
@@ -73,7 +82,7 @@ async def render_thumbnail_fal(concept: ThumbnailConcept, output_path: Path) -> 
 
     try:
         await _render()
-        logger.info(f"Thumbnail rendered via fal.ai ({settings.fal_model}): {output_path}")
+        logger.info(f"Thumbnail rendered via fal.ai ({model}): {output_path}")
         return True
     except Exception as e:
         logger.error(f"fal.ai image generation failed after retries: {e}")
@@ -85,6 +94,7 @@ async def generate_thumbnail(
     seo: SEOPackage,
     niche: str,
     video_id: str,
+    thumbnail_model: str | None = None,
 ) -> tuple[list[ThumbnailConcept], ThumbnailConcept, str | None]:
     """Full thumbnail pipeline: concept generation + rendering all concepts in parallel."""
     thumbnail_dir = Path(settings.thumbnail_dir)
@@ -94,7 +104,7 @@ async def generate_thumbnail(
 
     paths = [thumbnail_dir / f"{video_id}_thumbnail_{c.concept_id}.jpg" for c in concepts]
     results = await asyncio.gather(*[
-        render_thumbnail_fal(concept, path)
+        render_thumbnail_fal(concept, path, thumbnail_model)
         for concept, path in zip(concepts, paths)
     ])
 
