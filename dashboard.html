@@ -2006,8 +2006,8 @@ function pathToRelUrl(absPath) {
 function buildTimings(timings) {
   if (!timings || !Object.keys(timings).length) return '';
   const max = Math.max(...Object.values(timings), 1);
-  const colorMap = { research:'tb-research', script:'tb-script', seo_affiliates:'tb-seo', voice:'tb-voice', thumbnail:'tb-thumbnail', video:'tb-video' };
-  const labelMap = { research:'Research', script:'Script', seo_affiliates:'SEO', voice:'Voice', thumbnail:'Thumbnail', video:'Video' };
+  const colorMap = { story_brief:'tb-research', script:'tb-script', metadata_cover:'tb-seo', voice:'tb-voice', thumbnail:'tb-thumbnail', video:'tb-video' };
+  const labelMap = { story_brief:'Story Brief', script:'Script', metadata_cover:'Metadata', voice:'Voice', thumbnail:'Cover Art', video:'Video' };
   const rows = Object.entries(timings).map(([k, v]) => `
     <div class="timing-row">
       <div class="timing-name">${labelMap[k] || k}</div>

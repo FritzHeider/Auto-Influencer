@@ -37,11 +37,9 @@ class Settings(BaseSettings):
     groq_api_key: str
     groq_model: str = "llama-3.3-70b-versatile"
 
-    # Channel config
-    channel_niche: str = "personal finance"
-    channel_tone: str = "authoritative"
-    channel_demographic: str = "25-45 year old professionals"
-    posting_cadence: int = 3
+    # Series defaults
+    default_genre: str = "drama"
+    default_tone: str = "cinematic"
 
     # Output paths
     output_dir: str = "./output"
@@ -55,6 +53,9 @@ class Settings(BaseSettings):
     # n8n webhook
     n8n_webhook_url: Optional[str] = None
     n8n_api_key: Optional[str] = None
+
+    # CORS — set to specific origins in production (e.g. ["https://yourdomain.com"])
+    allowed_origins: list[str] = ["*"]
 
 
 settings = Settings()

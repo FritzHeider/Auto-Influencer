@@ -9,24 +9,30 @@ from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import settings
-from pipeline.models import Script, SEOPackage, ThumbnailConcept
-from prompts.system_prompts import THUMBNAIL_PROMPT
+from pipeline.models import Script, EpisodeMetadata, ThumbnailConcept
+from prompts.system_prompts import COVER_ART_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
 async def generate_thumbnail_concepts(
     script: Script,
-    seo: SEOPackage,
-    niche: str,
+    metadata: EpisodeMetadata,
+    genre: str,
+    visual_style: str = "",
+    themes: list[str] | None = None,
 ) -> list[ThumbnailConcept]:
-    """Use OpenAI to plan thumbnail concepts."""
+    """Use OpenAI to plan cinematic cover art concepts for the episode."""
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
-    prompt = THUMBNAIL_PROMPT.format(
-        niche=niche,
-        title=seo.title,
-        hook=script.hook,
+    prompt = COVER_ART_PROMPT.format(
+        series_title=script.series_title or "Untitled Series",
+        episode_title=script.episode_title,
+        episode_number=script.episode_number,
+        genre=genre,
+        visual_style=visual_style or "cinematic",
+        hook=script.opening_hook,
+        themes=", ".join(themes or []),
     )
 
     response = await client.chat.completions.create(
@@ -91,16 +97,18 @@ async def render_thumbnail_fal(
 
 async def generate_thumbnail(
     script: Script,
-    seo: SEOPackage,
-    niche: str,
+    metadata: EpisodeMetadata,
+    genre: str,
     video_id: str,
+    visual_style: str = "",
+    themes: list[str] | None = None,
     thumbnail_model: str | None = None,
 ) -> tuple[list[ThumbnailConcept], ThumbnailConcept, str | None]:
-    """Full thumbnail pipeline: concept generation + rendering all concepts in parallel."""
+    """Full cover art pipeline: concept generation + rendering all concepts in parallel."""
     thumbnail_dir = Path(settings.thumbnail_dir)
     thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
-    concepts = await generate_thumbnail_concepts(script, seo, niche)
+    concepts = await generate_thumbnail_concepts(script, metadata, genre, visual_style, themes)
 
     paths = [thumbnail_dir / f"{video_id}_thumbnail_{c.concept_id}.jpg" for c in concepts]
     results = await asyncio.gather(*[

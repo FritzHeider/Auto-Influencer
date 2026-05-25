@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Fully automated faceless YouTube/TikTok content engine. One `run_pipeline()` call produces a complete video package: researched topic, scripted content, voiceover audio, SEO metadata, affiliate insertions, thumbnail image, and assembled B-roll video — saved as `./output/{video_id}_package.json`.
+Cinematic episodic video pipeline. One `run_pipeline()` call produces a complete `VideoPackage`: story brief, episode script, voiceover audio, episode metadata, cover art thumbnail, and assembled B-roll video — saved as `./output/{video_id}_package.json`.
 
 ## Commands
 
@@ -12,8 +12,8 @@ Fully automated faceless YouTube/TikTok content engine. One `run_pipeline()` cal
 source venv/bin/activate
 
 # Run pipeline (Python 3.14, venv/)
-python main.py --niche "personal finance" --tone authoritative
-python main.py --batch 3 --niche "tech" --skip-thumbnail --skip-video
+python main.py --genre "thriller" --tone "dark" --series "Night City" --episode 1
+python main.py --batch 3 --genre "sci-fi" --series "Stellar Drift" --skip-thumbnail --skip-video
 
 # API server
 uvicorn api:app --host 0.0.0.0 --port 8000 --reload
@@ -29,7 +29,7 @@ pytest test_pipeline.py -k "test_elevenlabs" -v
 
 ## Environment
 
-Required `.env`: `OPENAI_API_KEY`, `GROQ_API_KEY`, `FAL_KEY`. Optional: `ELEVEN_API_KEY`, `N8N_WEBHOOK_URL`, `N8N_API_KEY`, `CHANNEL_NICHE`, `CHANNEL_TONE`, `CHANNEL_DEMOGRAPHIC`. Settings uses `extra="ignore"` so unrelated keys in a shared `.env` are safe.
+Required `.env`: `OPENAI_API_KEY`, `GROQ_API_KEY`, `FAL_KEY`. Optional: `ELEVEN_API_KEY`, `N8N_WEBHOOK_URL`, `N8N_API_KEY`, `DEFAULT_GENRE`, `DEFAULT_TONE`. Settings uses `extra="ignore"` so unrelated keys in a shared `.env` are safe.
 
 ## File structure
 
@@ -51,11 +51,11 @@ workflow.json             importable n8n automation
 
 | Stage | File | Provider | Notes |
 |-------|------|----------|-------|
-| 1 Research | `stage1_research.py` | DuckDuckGo + Groq llama-3.3-70b (OpenAI fallback) | DDG queries run in parallel |
-| 2 Script | `stage2_script.py` | OpenAI GPT-4o | Produces `[BROLL:]`, `[PAUSE]`, `[EMPHASIS]`, `[AFFILIATE:]` markup |
+| 1 Story Brief | `stage1_research.py` | Groq llama-3.3-70b (OpenAI fallback) | Produces `EpisodeBrief`: concept, beats, hook, cliffhanger |
+| 2 Script | `stage2_script.py` | OpenAI GPT-4o | Produces `[BROLL:]`, `[SHOT:]`, `[MOOD:]`, `[PAUSE]`, `[EMPHASIS]` markup |
 | 3 Voice | `stage3_voice.py` | OpenAI TTS-HD → ElevenLabs fallback | `strip_script_markup()` cleans cues; chunked at 4 000 chars; ffmpeg -14 LUFS |
-| 4 Thumbnail | `stage4_thumbnail.py` | OpenAI (concepts) + fal.ai Flux | 3 concepts rendered in parallel; winner by `ctr_score`; model is overridable |
-| 5 SEO + Affiliates | `stage5_monetize.py` | OpenAI | Run in parallel via `asyncio.gather` alongside stage 4 |
+| 4 Cover Art | `stage4_thumbnail.py` | OpenAI (concepts) + fal.ai Flux | 3 concepts rendered in parallel; winner by `ctr_score`; model is overridable |
+| 5 Metadata | `stage5_metadata.py` | OpenAI | Run in parallel via `asyncio.gather` alongside stage 4 |
 | 6 Video | `stage6_video.py` | fal.ai Kling v2 + ffmpeg | Plans ClipSlots, generates all in parallel, concat + audio mix |
 
 Stages 4 and 5 run concurrently. Stage 6 runs after stage 3 (needs audio).
@@ -64,7 +64,7 @@ Stages 4 and 5 run concurrently. Stage 6 runs after stage 3 (needs audio).
 
 **Settings**: `config/settings.py` is a `pydantic_settings.BaseSettings` singleton. Import it as `from config.settings import settings` — never instantiate it again.
 
-**Models**: `VideoPackage` is the top-level container. `ResearchResult → Script → VoiceSpec + SEOPackage + AffiliateInsertion[] + ThumbnailConcept[]` all compose into it. `Script.sections` are `ScriptSection` objects with `broll_cues[]` driving video generation.
+**Models**: `VideoPackage` is the top-level container. `EpisodeBrief → Script → VoiceSpec + EpisodeMetadata + ThumbnailConcept[]` all compose into it. `Script.sections` are `ScriptSection` objects with `broll_cues[]` driving video generation. `Series` and `Character` models live separately for multi-episode continuity.
 
 **Prompts**: Every LLM call instructs the model to respond with JSON only; responses are parsed with `json.loads()` directly. All prompt strings live in `prompts/system_prompts.py`.
 

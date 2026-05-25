@@ -3,65 +3,76 @@ from typing import Optional
 from datetime import datetime, timezone
 
 
-class TrendTopic(BaseModel):
-    topic_title: str
-    search_volume_signal: str
-    competition_level: str
-    monetization_potential: str
-    trending_reason: str
-    score: float = 0.0
+class Character(BaseModel):
+    character_id: str
+    name: str
+    role: str = "supporting"   # protagonist | antagonist | supporting | narrator
+    description: str = ""      # physical appearance + personality
+    backstory: str = ""
+    voice_id: str = ""         # openai voice name or elevenlabs UUID
+    image_path: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class HookOption(BaseModel):
-    text: str
-    curiosity_score: float
-    emotional_score: float
-    specificity_score: float
-    total_score: float
+class Series(BaseModel):
+    series_id: str
+    title: str
+    genre: str = "drama"       # sci-fi | fantasy | thriller | drama | documentary | horror | comedy
+    tone: str = "cinematic"    # dark | uplifting | mysterious | comedic | epic | tense
+    logline: str = ""
+    world_notes: str = ""      # passed verbatim to every episode prompt
+    visual_style: str = ""     # cinematic style prefix for broll
+    color_grade: str = ""      # warm | cold | desaturated | vibrant | noir
+    character_ids: list[str] = []
+    episode_count: int = 0
+    last_cliffhanger: str = "" # stored after each episode for "Previously on..."
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class ResearchResult(BaseModel):
-    trends: list[TrendTopic]
-    selected_topic: TrendTopic
-    hooks: list[HookOption]
-    winning_hook: str
-    selection_rationale: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+class EpisodeBrief(BaseModel):
+    episode_concept: str
+    opening_hook: str
+    key_beats: list[str]
+    themes: list[str]
+    character_focus: list[str]
+    cliffhanger: str
+    previously_on: str = ""
 
 
 class ScriptSection(BaseModel):
     timestamp_start: str
     timestamp_end: str
-    label: str
+    label: str              # COLD_OPEN | ACT_1 | ACT_2 | ACT_3 | CLIMAX | DENOUEMENT | CLIFFHANGER
     content: str
     broll_cues: list[str] = []
-    affiliate_insertions: list[str] = []
+    shot_types: list[str] = []
+    characters_present: list[str] = []
+    mood: str = ""
 
 
 class Script(BaseModel):
-    topic: str
-    hook: str
+    episode_title: str
+    episode_number: int = 1
+    series_title: str = ""
+    opening_hook: str
     sections: list[ScriptSection]
     full_text: str
     word_count: int
     estimated_duration_minutes: float
-    affiliate_products: list[str] = []
-    reading_ease_score: Optional[float] = None
+    narration_style: str = "third_person"
+    cliffhanger: str = ""
 
 
 class VoiceSpec(BaseModel):
-    provider: str  # openai or elevenlabs
-    voice_id: str  # openai: alloy/onyx/nova/etc  elevenlabs: voice UUID
+    provider: str
+    voice_id: str
     voice_name: str
-    # OpenAI TTS fields
     openai_model: str = "tts-1-hd"
     speed: float = 1.0
-    # ElevenLabs fields (used only when provider=elevenlabs)
     stability: float = 0.5
     similarity_boost: float = 0.75
     style: float = 0.0
     speaker_boost: bool = True
-    # Post-processing
     ffmpeg_loudness_lufs: float = -14.0
     ffmpeg_eq_preset: str = "youtube"
 
@@ -79,52 +90,31 @@ class ThumbnailConcept(BaseModel):
     rendered_path: Optional[str] = None
 
 
-class SEOPackage(BaseModel):
+class EpisodeMetadata(BaseModel):
     title: str
     description: str
     tags: list[str]
     chapters: list[str] = []
-
-
-class AffiliateInsertion(BaseModel):
-    product_name: str
-    program: str
-    commission_rate: str
-    script_line: str
-    description_placement: str
+    synopsis: str = ""
 
 
 class VideoPackage(BaseModel):
-    schema_version: str = "2"
+    schema_version: str = "3"
     video_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    niche: str
-    research: ResearchResult
+    series_id: Optional[str] = None
+    series_title: str = ""
+    episode_number: int = 1
+    genre: str = "drama"
+    episode_brief: EpisodeBrief
     script: Script
     voice_spec: VoiceSpec
     thumbnail_concepts: list[ThumbnailConcept]
     winning_thumbnail: ThumbnailConcept
-    seo: SEOPackage
-    affiliates: list[AffiliateInsertion]
+    metadata: EpisodeMetadata
+    characters: list[str] = []
     audio_path: Optional[str] = None
     thumbnail_path: Optional[str] = None
     video_path: Optional[str] = None
     status: str = "pending"
     stage_timings: dict[str, float] = Field(default_factory=dict)
-
-
-class ChannelMetrics(BaseModel):
-    subscriber_count: int
-    avg_views_per_video: int
-    monthly_revenue_usd: float
-    channel_age_months: int
-    niche: str
-
-
-class RevenueProjection(BaseModel):
-    at_1k_subs: float
-    at_10k_subs: float
-    at_100k_subs: float
-    estimated_cpm_low: float
-    estimated_cpm_high: float
-    assumptions: list[str]

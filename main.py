@@ -7,12 +7,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from config.settings import settings
-from pipeline.models import VideoPackage
-from pipeline.stage1_research import run_research
+from pipeline.models import VideoPackage, VoiceSpec, ThumbnailConcept
+from pipeline.stage1_research import generate_story_brief
 from pipeline.stage2_script import generate_script
 from pipeline.stage3_voice import generate_voiceover
 from pipeline.stage4_thumbnail import generate_thumbnail
-from pipeline.stage5_monetize import generate_seo_package, generate_affiliate_insertions
+from pipeline.stage5_metadata import generate_episode_metadata
 from pipeline.stage6_video import generate_video
 
 logging.basicConfig(
@@ -22,27 +22,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_USED_TOPICS_FILE = Path(settings.output_dir) / "used_topics.json"
-
-
-def load_used_topics() -> list[str]:
-    if _USED_TOPICS_FILE.exists():
-        return json.loads(_USED_TOPICS_FILE.read_text())
-    return []
-
-
-def save_used_topic(topic: str) -> None:
-    topics = load_used_topics()
-    if topic not in topics:
-        topics.append(topic)
-    _USED_TOPICS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _USED_TOPICS_FILE.write_text(json.dumps(topics, indent=2))
-
 
 async def run_pipeline(
-    niche: str | None = None,
+    genre: str | None = None,
     tone: str | None = None,
-    demographic: str | None = None,
+    series_id: str | None = None,
+    series_title: str = "",
+    episode_number: int = 1,
+    story_prompt: str = "",
+    previously_on: str = "",
+    world_notes: str = "",
+    characters: list[dict] | None = None,
+    narration_style: str = "third_person",
+    visual_style: str = "",
+    color_grade: str = "",
+    music_mood: str = "neutral",
+    themes: list[str] | None = None,
     skip_voice: bool = False,
     skip_thumbnail: bool = False,
     skip_video: bool = False,
@@ -61,104 +56,114 @@ async def run_pipeline(
     reference_all_clips: bool = False,
 ) -> VideoPackage:
     """
-    Run the full AI influencer content pipeline.
+    Run the full cinematic episode pipeline.
 
-    Args:
-        niche: Channel niche (defaults to settings.channel_niche)
-        tone: Voice tone (defaults to settings.channel_tone)
-        demographic: Target demographic (defaults to settings.channel_demographic)
-        skip_voice: Skip TTS generation (useful for testing)
-        skip_thumbnail: Skip image generation (useful for testing)
-
-    Returns:
-        VideoPackage with all assets and metadata
+    Produces a complete VideoPackage: story brief, episode script, voiceover,
+    cover art, episode metadata, and assembled B-roll video.
     """
-    niche = niche or settings.channel_niche
-    tone = tone or settings.channel_tone
-    demographic = demographic or settings.channel_demographic
+    genre = genre or settings.default_genre
+    tone = tone or settings.default_tone
 
-    video_id = f"vid_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-    logger.info(f"=" * 60)
-    logger.info(f"Starting pipeline for video: {video_id}")
-    logger.info(f"Niche: {niche} | Tone: {tone} | Demo: {demographic}")
-    logger.info(f"=" * 60)
+    video_id = f"ep_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    logger.info("=" * 60)
+    logger.info(f"Starting episode pipeline: {video_id}")
+    logger.info(f"Series: {series_title!r} | Genre: {genre} | Tone: {tone} | Ep: {episode_number}")
+    logger.info("=" * 60)
 
     timings: dict[str, float] = {}
 
-    # Stage 1: Research + hooks
-    logger.info("Stage 1/5: Research + trend analysis")
+    # Stage 1: Story brief
+    logger.info("Stage 1/5: Story brief generation")
     t0 = time.monotonic()
-    used_topics = load_used_topics()
-    if used_topics:
-        logger.info(f"Dedup: avoiding {len(used_topics)} previously used topic(s)")
-    research = await run_research(niche, tone, demographic, used_topics=used_topics)
-    timings["research"] = round(time.monotonic() - t0, 2)
+    brief = await generate_story_brief(
+        genre=genre,
+        tone=tone,
+        series_title=series_title,
+        world_notes=world_notes,
+        characters=characters,
+        previously_on=previously_on,
+        story_prompt=story_prompt,
+        episode_number=episode_number,
+    )
+    timings["story_brief"] = round(time.monotonic() - t0, 2)
 
-    # Stage 2: Script generation
-    logger.info("Stage 2/5: Script generation")
+    # Stage 2: Episode script
+    logger.info("Stage 2/5: Episode script generation")
     t0 = time.monotonic()
-    script = await generate_script(research, niche, tone, demographic)
+    effective_visual = cinematic_style or visual_style
+    script = await generate_script(
+        brief=brief,
+        genre=genre,
+        tone=tone,
+        series_title=series_title,
+        episode_number=episode_number,
+        narration_style=narration_style,
+        visual_style=effective_visual,
+        color_grade=color_grade,
+        music_mood=music_mood,
+        characters=characters,
+    )
     timings["script"] = round(time.monotonic() - t0, 2)
 
-    # Stage 3: SEO + Affiliates (run in parallel)
-    logger.info("Stage 3/5: SEO + affiliate generation (parallel)")
-    t0 = time.monotonic()
-    seo, affiliates = await asyncio.gather(
-        generate_seo_package(script, niche, demographic),
-        generate_affiliate_insertions(script, niche),
-    )
-    timings["seo_affiliates"] = round(time.monotonic() - t0, 2)
-
-    # Stage 4: Voice generation
+    # Stage 3: Voice generation
     voice_spec = None
     audio_path = None
     if not skip_voice:
-        logger.info("Stage 4/5: Voice generation (OpenAI TTS → ElevenLabs fallback)")
+        logger.info("Stage 3/5: Voice generation (OpenAI TTS → ElevenLabs fallback)")
         t0 = time.monotonic()
         voice_spec, audio_path = await generate_voiceover(
-            script, niche, tone, demographic, video_id, voice_id_override=voice_id
+            script, genre, tone, narration_style, video_id,
+            voice_id_override=voice_id,
         )
         timings["voice"] = round(time.monotonic() - t0, 2)
     else:
-        logger.info("Stage 4/5: Skipped (skip_voice=True)")
-        from pipeline.models import VoiceSpec
-        voice_spec = VoiceSpec(
-            provider="openai",
-            voice_id="onyx",
-            voice_name="onyx",
+        logger.info("Stage 3/5: Skipped (skip_voice=True)")
+        voice_spec = VoiceSpec(provider="openai", voice_id="onyx", voice_name="onyx")
+
+    # Stages 4+5 run in parallel: Episode metadata + Cover art
+    logger.info("Stage 4+5/5: Episode metadata + cover art (parallel)")
+    t0 = time.monotonic()
+
+    episode_themes = themes or brief.themes
+
+    async def _metadata():
+        return await generate_episode_metadata(
+            script, genre, series_title=series_title, themes=episode_themes
         )
 
-    # Stage 5: Thumbnail generation
-    thumbnail_concepts = []
-    winning_thumbnail = None
-    thumbnail_path = None
-    if not skip_thumbnail:
-        logger.info("Stage 5/5: Thumbnail generation (fal.ai Flux)")
-        t0 = time.monotonic()
-        thumbnail_concepts, winning_thumbnail, thumbnail_path = await generate_thumbnail(
-            script, seo, niche, video_id, thumbnail_model=thumbnail_model
+    async def _cover_art():
+        if skip_thumbnail:
+            return None
+        return await generate_thumbnail(
+            script=script,
+            metadata=None,  # metadata not needed for prompt — we pass themes directly
+            genre=genre,
+            video_id=video_id,
+            visual_style=effective_visual,
+            themes=episode_themes,
+            thumbnail_model=thumbnail_model,
         )
-        timings["thumbnail"] = round(time.monotonic() - t0, 2)
+
+    metadata_result, thumbnail_result = await asyncio.gather(_metadata(), _cover_art())
+    timings["metadata_cover"] = round(time.monotonic() - t0, 2)
+
+    metadata = metadata_result
+    if thumbnail_result:
+        thumbnail_concepts, winning_thumbnail, thumbnail_path = thumbnail_result
     else:
-        logger.info("Stage 5/5: Skipped (skip_thumbnail=True)")
-        from pipeline.models import ThumbnailConcept
+        logger.info("Cover art: Skipped (skip_thumbnail=True)")
         winning_thumbnail = ThumbnailConcept(
-            concept_id=1,
-            layout_description="placeholder",
-            focal_element="placeholder",
-            text_overlay="placeholder",
-            accent_elements=[],
-            color_mood="neutral",
-            image_prompt="placeholder",
-            ctr_score=0.0,
-            is_winner=True,
+            concept_id=1, layout_description="placeholder", focal_element="placeholder",
+            text_overlay="", accent_elements=[], color_mood="neutral",
+            image_prompt="placeholder", ctr_score=0.0, is_winner=True,
         )
         thumbnail_concepts = [winning_thumbnail]
+        thumbnail_path = None
 
-    # Stage 6: Video assembly (B-roll + audio)
+    # Stage 6: Video assembly
     video_path = None
     if not skip_video and audio_path:
-        logger.info("Stage 6/6: Video assembly (fal.ai Kling B-roll + ffmpeg)")
+        logger.info("Stage 6/6: Video assembly (B-roll + ffmpeg)")
         t0 = time.monotonic()
         video_path = await generate_video(
             script, audio_path, video_id,
@@ -171,7 +176,7 @@ async def run_pipeline(
             use_native_audio=use_native_audio,
             transition=transition,
             card_style=card_style,
-            cinematic_style=cinematic_style,
+            cinematic_style=effective_visual,
             reference_all_clips=reference_all_clips,
         )
         timings["video"] = round(time.monotonic() - t0, 2)
@@ -187,14 +192,17 @@ async def run_pipeline(
     # Assemble final package
     package = VideoPackage(
         video_id=video_id,
-        niche=niche,
-        research=research,
+        series_id=series_id,
+        series_title=series_title,
+        episode_number=episode_number,
+        genre=genre,
+        episode_brief=brief,
         script=script,
         voice_spec=voice_spec,
         thumbnail_concepts=thumbnail_concepts,
         winning_thumbnail=winning_thumbnail,
-        seo=seo,
-        affiliates=affiliates,
+        metadata=metadata,
+        characters=[c.get("character_id", "") for c in (characters or []) if c.get("character_id")],
         audio_path=audio_path,
         thumbnail_path=thumbnail_path,
         video_path=video_path,
@@ -207,34 +215,36 @@ async def run_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
     package_path = output_dir / f"{video_id}_package.json"
     package_path.write_text(package.model_dump_json(indent=2))
-    save_used_topic(research.selected_topic.topic_title)
 
-    logger.info(f"=" * 60)
+    logger.info("=" * 60)
     logger.info(f"Pipeline complete: {video_id}")
-    logger.info(f"Topic: {research.selected_topic.topic_title}")
+    logger.info(f"Series: {series_title!r} | Episode {episode_number}: '{script.episode_title}'")
     logger.info(f"Script: {script.word_count} words / {script.estimated_duration_minutes:.1f} min")
-    logger.info(f"Title: {seo.title}")
-    logger.info(f"Audio: {audio_path or 'skipped'}")
-    logger.info(f"Thumbnail: {thumbnail_path or 'skipped'}")
+    logger.info(f"Audio: {audio_path or 'skipped'} | Thumbnail: {thumbnail_path or 'skipped'}")
     logger.info(f"Video: {video_path or 'skipped'}")
+    logger.info(f"Cliffhanger: {brief.cliffhanger[:80]}...")
     logger.info(f"Timings: { {k: f'{v}s' for k, v in timings.items()} }")
     logger.info(f"Package saved: {package_path}")
-    logger.info(f"=" * 60)
+    logger.info("=" * 60)
 
     return package
 
 
-async def run_batch(count: int = 3, **kwargs) -> list[VideoPackage]:
-    """Run pipeline N times in parallel for batch content production."""
-    logger.info(f"Starting batch run: {count} videos (parallel)")
+async def run_batch(count: int = 3, max_concurrent: int = 3, **kwargs) -> list[VideoPackage]:
+    """Run pipeline N times with bounded concurrency for batch episode production."""
+    logger.info(f"Starting batch run: {count} episodes (max {max_concurrent} concurrent)")
+    sem = asyncio.Semaphore(max_concurrent)
 
     async def _run_one(index: int) -> VideoPackage | None:
-        logger.info(f"Batch video {index + 1}/{count} starting")
-        try:
-            return await run_pipeline(**kwargs)
-        except Exception as e:
-            logger.error(f"Batch video {index + 1} failed: {e}")
-            return None
+        async with sem:
+            kw = dict(kwargs)
+            kw["episode_number"] = kwargs.get("episode_number", 1) + index
+            logger.info(f"Batch episode {index + 1}/{count} starting (Ep {kw['episode_number']})")
+            try:
+                return await run_pipeline(**kw)
+            except Exception as e:
+                logger.error(f"Batch episode {index + 1} failed: {e}")
+                return None
 
     results = await asyncio.gather(*[_run_one(i) for i in range(count)])
     packages = [r for r in results if r is not None]
@@ -245,37 +255,32 @@ async def run_batch(count: int = 3, **kwargs) -> list[VideoPackage]:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="AI Influencer Content Pipeline")
-    parser.add_argument("--niche", type=str, help="Channel niche")
-    parser.add_argument("--tone", type=str, help="Voice tone")
-    parser.add_argument("--demographic", type=str, help="Target demographic")
-    parser.add_argument("--batch", type=int, default=1, help="Number of videos to produce")
-    parser.add_argument("--skip-voice", action="store_true", help="Skip TTS generation")
-    parser.add_argument("--skip-thumbnail", action="store_true", help="Skip thumbnail generation")
-    parser.add_argument("--skip-video", action="store_true", help="Skip video assembly")
+    parser = argparse.ArgumentParser(description="Cinematic Episode Pipeline")
+    parser.add_argument("--genre", type=str, default="drama", help="Story genre")
+    parser.add_argument("--tone", type=str, default="cinematic", help="Narrative tone")
+    parser.add_argument("--series", type=str, default="", help="Series title")
+    parser.add_argument("--episode", type=int, default=1, help="Episode number")
+    parser.add_argument("--prompt", type=str, default="", help="Story direction prompt")
+    parser.add_argument("--batch", type=int, default=1, help="Number of episodes to produce")
+    parser.add_argument("--skip-voice", action="store_true")
+    parser.add_argument("--skip-thumbnail", action="store_true")
+    parser.add_argument("--skip-video", action="store_true")
 
     args = parser.parse_args()
 
     if args.batch > 1:
-        asyncio.run(
-            run_batch(
-                count=args.batch,
-                niche=args.niche,
-                tone=args.tone,
-                demographic=args.demographic,
-                skip_voice=args.skip_voice,
-                skip_thumbnail=args.skip_thumbnail,
-                skip_video=args.skip_video,
-            )
-        )
+        asyncio.run(run_batch(
+            count=args.batch, genre=args.genre, tone=args.tone,
+            series_title=args.series, episode_number=args.episode,
+            story_prompt=args.prompt,
+            skip_voice=args.skip_voice, skip_thumbnail=args.skip_thumbnail,
+            skip_video=args.skip_video,
+        ))
     else:
-        asyncio.run(
-            run_pipeline(
-                niche=args.niche,
-                tone=args.tone,
-                demographic=args.demographic,
-                skip_voice=args.skip_voice,
-                skip_thumbnail=args.skip_thumbnail,
-                skip_video=args.skip_video,
-            )
-        )
+        asyncio.run(run_pipeline(
+            genre=args.genre, tone=args.tone,
+            series_title=args.series, episode_number=args.episode,
+            story_prompt=args.prompt,
+            skip_voice=args.skip_voice, skip_thumbnail=args.skip_thumbnail,
+            skip_video=args.skip_video,
+        ))

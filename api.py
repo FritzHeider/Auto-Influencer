@@ -10,13 +10,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import anthropic
 import fal_client
 import httpx
 from fastapi import FastAPI, BackgroundTasks, File, Form, HTTPException, Header, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from config.settings import settings
 from main import run_pipeline, run_batch
@@ -36,6 +35,7 @@ def _db() -> sqlite3.Connection:
 
 def _init_db() -> None:
     with _db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute(
             """CREATE TABLE IF NOT EXISTS jobs (
                 job_id   TEXT PRIMARY KEY,
@@ -46,6 +46,13 @@ def _init_db() -> None:
         conn.execute(
             """CREATE TABLE IF NOT EXISTS episodes (
                 episode_id TEXT PRIMARY KEY,
+                data       TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS series (
+                series_id  TEXT PRIMARY KEY,
                 data       TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )"""
@@ -72,67 +79,127 @@ def all_jobs() -> dict[str, dict]:
     return {row["job_id"]: json.loads(row["data"]) for row in rows}
 
 
+# ── Series DB helpers ─────────────────────────────────────────────────────────
+
+def set_series_db(series_id: str, data: dict) -> None:
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO series (series_id, data) VALUES (?, ?)",
+            (series_id, json.dumps(data, default=str)),
+        )
+
+
+def get_series_db(series_id: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute("SELECT data FROM series WHERE series_id = ?", (series_id,)).fetchone()
+    return json.loads(row["data"]) if row else None
+
+
+def all_series_db() -> list[dict]:
+    with _db() as conn:
+        rows = conn.execute("SELECT data FROM series ORDER BY created_at DESC").fetchall()
+    return [json.loads(r["data"]) for r in rows]
+
+
+def delete_series_db(series_id: str) -> bool:
+    with _db() as conn:
+        cur = conn.execute("DELETE FROM series WHERE series_id = ?", (series_id,))
+    return cur.rowcount > 0
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _init_db()
-    logger.info(f"AI Influencer Pipeline API starting up (job store: {_DB_PATH})")
+    logger.info(f"RoboModal Studio API starting (job store: {_DB_PATH})")
     yield
-    logger.info("AI Influencer Pipeline API shutting down")
+    logger.info("RoboModal Studio API shutting down")
 
 
 app = FastAPI(
-    title="AI Influencer Pipeline API",
-    description="Webhook server for n8n-triggered content production",
-    version="1.0.0",
+    title="RoboModal Studio API",
+    description="Cinematic episodic video pipeline",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 class PipelineRequest(BaseModel):
-    niche: Optional[str] = None
+    # Episode identity
+    series_id: Optional[str] = None
+    series_title: str = ""
+    episode_number: int = 1
+    genre: Optional[str] = None
     tone: Optional[str] = None
-    demographic: Optional[str] = None
+    # Creative direction
+    story_prompt: str = ""
+    previously_on: str = ""
+    world_notes: str = ""
+    narration_style: str = "third_person"
+    visual_style: str = ""
+    color_grade: str = ""
+    music_mood: str = "neutral"
+    themes: list[str] = []
+    character_ids: list[str] = []
+    # Pipeline toggles
     skip_voice: bool = False
     skip_thumbnail: bool = False
     skip_video: bool = False
     webhook_callback: Optional[str] = None
-    # Advanced options
-    scene_style: Optional[str] = None          # cinematic | documentary | artistic | corporate
-    thumbnail_model: Optional[str] = None       # override fal thumbnail model
-    avatar_id: Optional[str] = None            # use stored avatar by ID
-    avatar_model: Optional[str] = None         # sadtalker | hallo
-    voice_id: Optional[str] = None             # openai voice override
-    style_locked_broll: bool = False           # all broll clips use same angle
-    video_model: Optional[str] = None          # fal.ai video model ID
-    reference_image_id: Optional[str] = None   # stored reference image for i2v
-    use_native_audio: bool = False             # blend model ambient audio with voiceover
-    transition: str = "cut"                    # cut | crossfade
-    card_style: str = "pillow"                 # pillow | remotion
-    cinematic_style: Optional[str] = None      # prefix prepended to every broll prompt
-    reference_all_clips: bool = False          # apply reference image to all broll via r2v
+    # Advanced video/media options
+    scene_style: Optional[str] = None
+    thumbnail_model: Optional[str] = None
+    avatar_id: Optional[str] = None
+    avatar_model: Optional[str] = None
+    voice_id: Optional[str] = None
+    style_locked_broll: bool = False
+    video_model: Optional[str] = None
+    reference_image_id: Optional[str] = None
+    use_native_audio: bool = False
+    transition: str = "cut"
+    card_style: str = "pillow"
+    cinematic_style: Optional[str] = None
+    reference_all_clips: bool = False
+
+    @model_validator(mode="after")
+    def check_audio_transition_compat(self) -> "PipelineRequest":
+        if self.use_native_audio and self.transition == "crossfade":
+            raise ValueError("use_native_audio and transition='crossfade' are mutually exclusive")
+        return self
 
 
 class BatchRequest(BaseModel):
     count: int = 3
-    niche: Optional[str] = None
+    genre: Optional[str] = None
     tone: Optional[str] = None
-    demographic: Optional[str] = None
+    series_id: Optional[str] = None
+    series_title: str = ""
+    episode_number: int = 1
+    story_prompts: list[str] = []
     skip_voice: bool = False
     skip_thumbnail: bool = False
     skip_video: bool = False
-    topics: list[str] = []                     # per-video topic overrides
 
 
 class AvatarRequest(BaseModel):
-    niche: str
+    genre: str
     style: Optional[str] = None
+
+
+class SeriesRequest(BaseModel):
+    title: str
+    genre: str = "drama"
+    tone: str = "cinematic"
+    logline: str = ""
+    world_notes: str = ""
+    visual_style: str = ""
+    color_grade: str = ""
 
 
 def verify_api_key(x_api_key: Optional[str] = Header(default=None)):
@@ -141,7 +208,6 @@ def verify_api_key(x_api_key: Optional[str] = Header(default=None)):
 
 
 async def _fire_webhook(url: str, payload: dict, max_attempts: int = 3) -> None:
-    """POST to webhook URL with exponential backoff retry."""
     delay = 2.0
     async with httpx.AsyncClient(timeout=15.0) as client:
         for attempt in range(1, max_attempts + 1):
@@ -159,18 +225,47 @@ async def _fire_webhook(url: str, payload: dict, max_attempts: int = 3) -> None:
                     delay *= 2
 
 
+def _resolve_characters(character_ids: list[str]) -> list[dict]:
+    """Load character data from the reference media index for given IDs."""
+    if not character_ids:
+        return []
+    index = _load_ref_media_index()
+    chars = {e["ref_id"]: e for e in index if e.get("media_type") == "character"}
+    return [chars[cid] for cid in character_ids if cid in chars]
+
+
 async def run_pipeline_job(job_id: str, request: PipelineRequest):
     """Background job runner with SQLite-backed status tracking."""
     set_job(job_id, {
         "status": "running", "video_id": None, "error": None,
-        "webhook_callback": request.webhook_callback,
-        "webhook_status": None,
+        "series_id": request.series_id, "series_title": request.series_title,
+        "episode_number": request.episode_number,
+        "webhook_callback": request.webhook_callback, "webhook_status": None,
     })
+
+    # Resolve series context if series_id provided
+    series_data = {}
+    if request.series_id:
+        series_data = get_series_db(request.series_id) or {}
+
+    characters = _resolve_characters(request.character_ids)
+
     try:
         package = await run_pipeline(
-            niche=request.niche,
-            tone=request.tone,
-            demographic=request.demographic,
+            genre=request.genre or series_data.get("genre"),
+            tone=request.tone or series_data.get("tone"),
+            series_id=request.series_id,
+            series_title=request.series_title or series_data.get("title", ""),
+            episode_number=request.episode_number,
+            story_prompt=request.story_prompt,
+            previously_on=request.previously_on or series_data.get("last_cliffhanger", ""),
+            world_notes=request.world_notes or series_data.get("world_notes", ""),
+            characters=characters,
+            narration_style=request.narration_style,
+            visual_style=request.visual_style or series_data.get("visual_style", ""),
+            color_grade=request.color_grade or series_data.get("color_grade", ""),
+            music_mood=request.music_mood,
+            themes=request.themes,
             skip_voice=request.skip_voice,
             skip_thumbnail=request.skip_thumbnail,
             skip_video=request.skip_video,
@@ -188,21 +283,32 @@ async def run_pipeline_job(job_id: str, request: PipelineRequest):
             cinematic_style=request.cinematic_style,
             reference_all_clips=request.reference_all_clips,
         )
+
+        # Update series last_cliffhanger and episode_count
+        if request.series_id and series_data:
+            series_data["last_cliffhanger"] = package.episode_brief.cliffhanger
+            series_data["episode_count"] = series_data.get("episode_count", 0) + 1
+            set_series_db(request.series_id, series_data)
+
         result = {
             "status": "complete",
             "video_id": package.video_id,
-            "title": package.seo.title,
-            "topic": package.research.selected_topic.topic_title,
+            "series_id": package.series_id,
+            "series_title": package.series_title,
+            "episode_number": package.episode_number,
+            "episode_title": package.script.episode_title,
+            "synopsis": package.metadata.synopsis,
+            "title": package.metadata.title,
+            "cliffhanger": package.episode_brief.cliffhanger,
             "word_count": package.script.word_count,
             "duration_min": package.script.estimated_duration_minutes,
             "audio_path": package.audio_path,
             "thumbnail_path": package.thumbnail_path,
             "video_path": package.video_path,
-            "tags": package.seo.tags,
-            "affiliates": [a.product_name for a in package.affiliates],
+            "tags": package.metadata.tags,
             "stage_timings": package.stage_timings,
             "full_script": package.script.full_text,
-            "description": package.seo.description,
+            "description": package.metadata.description,
             "thumbnail_paths": [c.rendered_path for c in package.thumbnail_concepts if c.rendered_path],
             "webhook_callback": request.webhook_callback,
             "webhook_status": None,
@@ -251,7 +357,7 @@ async def health():
     all_ok = all(s == "ok" for s in [openai_status, groq_status, fal_status])
     return {
         "status": "ok" if all_ok else "degraded",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "providers": {
             "openai": openai_status,
             "groq": groq_status,
@@ -267,7 +373,7 @@ async def trigger_pipeline(
     background_tasks: BackgroundTasks,
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Trigger a single video pipeline run. Returns job_id immediately."""
+    """Trigger a single episode pipeline run. Returns job_id immediately."""
     verify_api_key(x_api_key)
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     set_job(job_id, {"status": "queued"})
@@ -280,13 +386,25 @@ async def trigger_pipeline_sync(
     request: PipelineRequest,
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Synchronous pipeline run — blocks until complete. Use for n8n Wait nodes."""
+    """Synchronous episode pipeline — blocks until complete."""
     verify_api_key(x_api_key)
+    series_data = {}
+    if request.series_id:
+        series_data = get_series_db(request.series_id) or {}
+    characters = _resolve_characters(request.character_ids)
     try:
         package = await run_pipeline(
-            niche=request.niche,
-            tone=request.tone,
-            demographic=request.demographic,
+            genre=request.genre or series_data.get("genre"),
+            tone=request.tone or series_data.get("tone"),
+            series_id=request.series_id,
+            series_title=request.series_title or series_data.get("title", ""),
+            episode_number=request.episode_number,
+            story_prompt=request.story_prompt,
+            previously_on=request.previously_on or series_data.get("last_cliffhanger", ""),
+            world_notes=request.world_notes or series_data.get("world_notes", ""),
+            characters=characters,
+            narration_style=request.narration_style,
+            visual_style=request.visual_style or series_data.get("visual_style", ""),
             skip_voice=request.skip_voice,
             skip_thumbnail=request.skip_thumbnail,
             skip_video=request.skip_video,
@@ -294,21 +412,14 @@ async def trigger_pipeline_sync(
         return {
             "status": "complete",
             "video_id": package.video_id,
-            "title": package.seo.title,
-            "topic": package.research.selected_topic.topic_title,
-            "hook": package.script.hook,
+            "episode_title": package.script.episode_title,
+            "episode_number": package.episode_number,
+            "synopsis": package.metadata.synopsis,
+            "cliffhanger": package.episode_brief.cliffhanger,
             "word_count": package.script.word_count,
             "duration_min": package.script.estimated_duration_minutes,
-            "description": package.seo.description,
-            "tags": package.seo.tags,
-            "chapters": package.seo.chapters,
             "audio_path": package.audio_path,
             "thumbnail_path": package.thumbnail_path,
-            "stage_timings": package.stage_timings,
-            "affiliates": [
-                {"product": a.product_name, "script_line": a.script_line}
-                for a in package.affiliates
-            ],
             "full_script": package.script.full_text,
         }
     except Exception as e:
@@ -321,39 +432,42 @@ async def trigger_batch(
     background_tasks: BackgroundTasks,
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Trigger a batch run of N videos."""
+    """Trigger a batch run of N episodes."""
     verify_api_key(x_api_key)
     batch_id = f"batch_{uuid.uuid4().hex[:8]}"
-
-    topics = request.topics or []
+    prompts = request.story_prompts
 
     async def run_batch_job():
         set_job(batch_id, {"status": "running", "count": request.count, "completed": 0})
+        sem = asyncio.Semaphore(3)
 
-        async def _run_one_with_topic(index: int):
-            niche_override = topics[index] if index < len(topics) else request.niche
-            try:
-                from main import run_pipeline as _rp
-                return await _rp(
-                    niche=niche_override,
-                    tone=request.tone,
-                    demographic=request.demographic,
-                    skip_voice=request.skip_voice,
-                    skip_thumbnail=request.skip_thumbnail,
-                    skip_video=request.skip_video,
-                )
-            except Exception as e:
-                logger.error(f"Batch video {index+1} failed: {e}")
-                return None
+        async def _run_one(index: int):
+            async with sem:
+                story_prompt = prompts[index] if index < len(prompts) else ""
+                try:
+                    return await run_pipeline(
+                        genre=request.genre,
+                        tone=request.tone,
+                        series_id=request.series_id,
+                        series_title=request.series_title,
+                        episode_number=request.episode_number + index,
+                        story_prompt=story_prompt,
+                        skip_voice=request.skip_voice,
+                        skip_thumbnail=request.skip_thumbnail,
+                        skip_video=request.skip_video,
+                    )
+                except Exception as e:
+                    logger.error(f"Batch episode {index+1} failed: {e}")
+                    return None
 
-        results = await asyncio.gather(*[_run_one_with_topic(i) for i in range(request.count)])
+        results = await asyncio.gather(*[_run_one(i) for i in range(request.count)])
         packages = [r for r in results if r is not None]
         set_job(batch_id, {
             "status": "complete",
             "count": request.count,
             "completed": len(packages),
             "video_ids": [p.video_id for p in packages],
-            "titles": [p.seo.title for p in packages],
+            "titles": [p.metadata.title for p in packages],
         })
 
     background_tasks.add_task(run_batch_job)
@@ -362,7 +476,6 @@ async def trigger_batch(
 
 @app.get("/jobs/{job_id}")
 async def get_job_status(job_id: str):
-    """Poll job status."""
     data = get_job(job_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -371,8 +484,118 @@ async def get_job_status(job_id: str):
 
 @app.get("/jobs")
 async def list_jobs_endpoint():
-    """List all jobs (most recent first)."""
     return {"jobs": all_jobs()}
+
+
+# ── Series endpoints ──────────────────────────────────────────────────────────
+
+@app.post("/series")
+async def create_series(
+    request: SeriesRequest,
+    x_api_key: Optional[str] = Header(default=None),
+):
+    """Create a new story series."""
+    verify_api_key(x_api_key)
+    series_id = f"ser_{uuid.uuid4().hex[:10]}"
+    data = {
+        "series_id": series_id,
+        "title": request.title,
+        "genre": request.genre,
+        "tone": request.tone,
+        "logline": request.logline,
+        "world_notes": request.world_notes,
+        "visual_style": request.visual_style,
+        "color_grade": request.color_grade,
+        "character_ids": [],
+        "episode_count": 0,
+        "last_cliffhanger": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    set_series_db(series_id, data)
+    return data
+
+
+@app.get("/series")
+async def list_series():
+    """List all series."""
+    return {"series": all_series_db()}
+
+
+@app.get("/series/{series_id}")
+async def get_series(series_id: str):
+    """Get a specific series."""
+    data = get_series_db(series_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Series not found")
+    return data
+
+
+@app.put("/series/{series_id}")
+async def update_series(
+    series_id: str,
+    request: SeriesRequest,
+    x_api_key: Optional[str] = Header(default=None),
+):
+    """Update a series."""
+    verify_api_key(x_api_key)
+    existing = get_series_db(series_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Series not found")
+    existing.update({
+        "title": request.title,
+        "genre": request.genre,
+        "tone": request.tone,
+        "logline": request.logline,
+        "world_notes": request.world_notes,
+        "visual_style": request.visual_style,
+        "color_grade": request.color_grade,
+    })
+    set_series_db(series_id, existing)
+    return existing
+
+
+@app.delete("/series/{series_id}")
+async def delete_series(series_id: str, x_api_key: Optional[str] = Header(default=None)):
+    """Delete a series."""
+    verify_api_key(x_api_key)
+    if not delete_series_db(series_id):
+        raise HTTPException(status_code=404, detail="Series not found")
+    return {"deleted": series_id}
+
+
+def _scan_series_episodes(series_id: str) -> list[dict]:
+    output_dir = Path(settings.output_dir)
+    episodes = []
+    for pkg_file in sorted(output_dir.glob("ep_*_package.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            data = json.loads(pkg_file.read_text())
+            if data.get("series_id") == series_id:
+                script = data.get("script") or {}
+                metadata = data.get("metadata") or {}
+                brief = data.get("episode_brief") or {}
+                episodes.append({
+                    "video_id": data.get("video_id"),
+                    "episode_number": data.get("episode_number", 1),
+                    "episode_title": script.get("episode_title", ""),
+                    "synopsis": metadata.get("synopsis", ""),
+                    "cliffhanger": brief.get("cliffhanger", ""),
+                    "duration_min": script.get("estimated_duration_minutes"),
+                    "audio_path": data.get("audio_path"),
+                    "video_path": data.get("video_path"),
+                    "thumbnail_path": data.get("thumbnail_path"),
+                    "created_at": data.get("created_at"),
+                })
+        except Exception:
+            continue
+    episodes.sort(key=lambda e: e.get("episode_number", 0))
+    return episodes
+
+
+@app.get("/series/{series_id}/episodes")
+async def list_series_episodes(series_id: str):
+    """List all completed episodes for a series from filesystem scan."""
+    episodes = await asyncio.to_thread(_scan_series_episodes, series_id)
+    return {"series_id": series_id, "episodes": episodes}
 
 
 # ── Avatar endpoints ──────────────────────────────────────────────────────────
@@ -399,7 +622,7 @@ async def generate_avatar(
     request: AvatarRequest,
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Generate and store a new presenter avatar image."""
+    """Generate and store a narrator/presenter avatar image."""
     verify_api_key(x_api_key)
     fal_client.api_key = settings.fal_key
     avatar_id = uuid.uuid4().hex[:10]
@@ -412,9 +635,9 @@ async def generate_avatar(
             "fal-ai/flux/dev",
             arguments={
                 "prompt": (
-                    f"professional {request.niche} YouTube presenter, looking directly at camera, "
-                    f"clean modern studio background with soft bokeh, business casual{style_desc}, "
-                    "warm confident expression, portrait photograph, sharp focus, 4K"
+                    f"cinematic {request.genre} story narrator, looking directly at camera, "
+                    f"dramatic lighting, moody studio background with soft bokeh{style_desc}, "
+                    "intense focused expression, portrait photograph, sharp focus, 4K"
                 ),
                 "image_size": {"width": 512, "height": 512},
                 "num_inference_steps": 28,
@@ -435,7 +658,7 @@ async def generate_avatar(
 
     entry = {
         "avatar_id": avatar_id,
-        "niche": request.niche,
+        "genre": request.genre,
         "style": request.style,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "path": str(avatar_path),
@@ -448,20 +671,17 @@ async def generate_avatar(
 
 @app.get("/avatars")
 async def list_avatars():
-    """List all stored avatars."""
     return {"avatars": _load_avatar_index()}
 
 
 @app.delete("/avatars/{avatar_id}")
 async def delete_avatar(avatar_id: str, x_api_key: Optional[str] = Header(default=None)):
-    """Delete a stored avatar."""
     verify_api_key(x_api_key)
     index = _load_avatar_index()
     new_index = [e for e in index if e["avatar_id"] != avatar_id]
     if len(new_index) == len(index):
         raise HTTPException(status_code=404, detail="Avatar not found")
-    avatar_path = Path(settings.avatar_store_dir) / f"{avatar_id}.jpg"
-    avatar_path.unlink(missing_ok=True)
+    Path(settings.avatar_store_dir, f"{avatar_id}.jpg").unlink(missing_ok=True)
     _save_avatar_index(new_index)
     return {"deleted": avatar_id}
 
@@ -491,7 +711,6 @@ async def upload_reference_media(
     media_type: str = Form(default="image"),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Upload a reference image (or video/audio) to use in pipeline runs."""
     verify_api_key(x_api_key)
     store_dir = Path(settings.reference_media_dir)
     store_dir.mkdir(parents=True, exist_ok=True)
@@ -499,11 +718,9 @@ async def upload_reference_media(
     ref_id = uuid.uuid4().hex[:10]
     content = await file.read()
 
-    # Determine extension from MIME type, with common fixes
     ext = mimetypes.guess_extension(file.content_type or "application/octet-stream") or ""
     ext = ext.replace(".jpe", ".jpg").replace(".jfif", ".jpg")
     if not ext or ext == ".bin":
-        # Fall back to original filename extension
         orig_ext = Path(file.filename or "").suffix
         ext = orig_ext if orig_ext else ".bin"
 
@@ -527,13 +744,11 @@ async def upload_reference_media(
 
 @app.get("/reference-media")
 async def list_reference_media():
-    """List all stored reference media."""
     return {"items": _load_ref_media_index()}
 
 
 @app.delete("/reference-media/{ref_id}")
 async def delete_reference_media(ref_id: str, x_api_key: Optional[str] = Header(default=None)):
-    """Delete a stored reference media item."""
     verify_api_key(x_api_key)
     index = _load_ref_media_index()
     entry = next((e for e in index if e["ref_id"] == ref_id), None)
@@ -550,9 +765,13 @@ async def delete_reference_media(ref_id: str, x_api_key: Optional[str] = Header(
 async def generate_character(
     prompt: str = Form(...),
     name: str = Form(default=""),
+    role: str = Form(default="supporting"),
+    description: str = Form(default=""),
+    backstory: str = Form(default=""),
+    voice_id: str = Form(default=""),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Generate a character image with Flux and store it as reference media."""
+    """Generate a character image with Flux and store with full profile."""
     verify_api_key(x_api_key)
     fal_client.api_key = settings.fal_key
     ref_id = uuid.uuid4().hex[:10]
@@ -590,6 +809,10 @@ async def generate_character(
         "size_bytes": char_path.stat().st_size,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "name": name or "",
+        "role": role,
+        "description": description,
+        "backstory": backstory,
+        "voice_id": voice_id,
         "prompt": prompt,
     }
     index = _load_ref_media_index()
@@ -600,22 +823,40 @@ async def generate_character(
 
 @app.get("/characters")
 async def list_characters():
-    """List all stored character images."""
+    """List all stored character profiles."""
     index = _load_ref_media_index()
     chars = [e for e in index if e.get("media_type") == "character"]
     return {"characters": chars}
 
 
+@app.put("/characters/{char_id}")
+async def update_character(
+    char_id: str,
+    name: str = Form(default=""),
+    role: str = Form(default="supporting"),
+    description: str = Form(default=""),
+    backstory: str = Form(default=""),
+    voice_id: str = Form(default=""),
+    x_api_key: Optional[str] = Header(default=None),
+):
+    """Update a character's profile fields."""
+    verify_api_key(x_api_key)
+    index = _load_ref_media_index()
+    entry = next((e for e in index if e["ref_id"] == char_id and e.get("media_type") == "character"), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Character not found")
+    entry.update({"name": name, "role": role, "description": description, "backstory": backstory, "voice_id": voice_id})
+    _save_ref_media_index(index)
+    return entry
+
+
 @app.delete("/characters/{char_id}")
 async def delete_character(char_id: str, x_api_key: Optional[str] = Header(default=None)):
-    """Delete a stored character image."""
     verify_api_key(x_api_key)
     index = _load_ref_media_index()
     entry = next((e for e in index if e["ref_id"] == char_id), None)
-    if not entry:
+    if not entry or entry.get("media_type") != "character":
         raise HTTPException(status_code=404, detail="Character not found")
-    if entry.get("media_type") != "character":
-        raise HTTPException(status_code=400, detail="Not a character entry")
     Path(entry["path"]).unlink(missing_ok=True)
     _save_ref_media_index([e for e in index if e["ref_id"] != char_id])
     return {"deleted": char_id}
@@ -625,7 +866,6 @@ async def delete_character(char_id: str, x_api_key: Optional[str] = Header(defau
 
 @app.get("/packages/{video_id}")
 async def get_package(video_id: str):
-    """Return the full JSON package for a completed video."""
     package_path = Path(settings.output_dir) / f"{video_id}_package.json"
     if not package_path.exists():
         raise HTTPException(status_code=404, detail="Package not found")
@@ -634,10 +874,8 @@ async def get_package(video_id: str):
 
 @app.get("/files/{path:path}")
 async def serve_output_file(path: str):
-    """Serve a file from the output directory (audio, video, thumbnails, avatars)."""
     output_root = Path(settings.output_dir).resolve()
     file_path = (output_root / path).resolve()
-    # Security: must remain within output_dir
     try:
         file_path.relative_to(output_root)
     except ValueError:
@@ -659,11 +897,9 @@ class PromptPreviewRequest(BaseModel):
 
 @app.post("/preview-prompt")
 async def preview_prompt(request: PromptPreviewRequest):
-    """Preview the enriched B-roll prompt that would be sent to the video model."""
     from pipeline.stage6_video import _enrich_prompt
     prompts = []
-    max_variants = 4
-    for v in range(max_variants):
+    for v in range(4):
         prompts.append(_enrich_prompt(
             request.cue, request.topic, request.cue,
             variant=v, scene_style=request.scene_style, style_locked=request.style_locked,
@@ -675,32 +911,34 @@ async def preview_prompt(request: PromptPreviewRequest):
 
 # ── Projects (filesystem scan) ────────────────────────────────────────────────
 
-@app.get("/projects")
-async def list_projects():
-    """List all completed video packages from filesystem scan (survives DB resets)."""
+def _scan_projects() -> list[dict]:
     output_dir = Path(settings.output_dir)
     projects = []
-    for pkg_file in sorted(output_dir.glob("*_package.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for pkg_file in sorted(output_dir.glob("ep_*_package.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(pkg_file.read_text())
-            seo = data.get("seo") or {}
             script = data.get("script") or {}
-            research = data.get("research") or {}
-            selected_topic = (research.get("selected_topic") or {}) if isinstance(research, dict) else {}
+            metadata = data.get("metadata") or {}
+            brief = data.get("episode_brief") or {}
             thumb_paths = [
                 c.get("rendered_path") for c in (data.get("thumbnail_concepts") or [])
                 if isinstance(c, dict) and c.get("rendered_path")
             ]
             projects.append({
                 "video_id": data.get("video_id", ""),
-                "title": seo.get("title", "") if isinstance(seo, dict) else "",
-                "topic": selected_topic.get("topic_title", "") if isinstance(selected_topic, dict) else "",
-                "niche": data.get("niche", ""),
+                "series_id": data.get("series_id"),
+                "series_title": data.get("series_title", ""),
+                "episode_number": data.get("episode_number", 1),
+                "episode_title": script.get("episode_title", ""),
+                "genre": data.get("genre", ""),
+                "synopsis": metadata.get("synopsis", ""),
+                "cliffhanger": brief.get("cliffhanger", ""),
+                "title": metadata.get("title", ""),
                 "created_at": data.get("created_at", ""),
-                "duration_min": script.get("estimated_duration_minutes") if isinstance(script, dict) else None,
-                "word_count": script.get("word_count") if isinstance(script, dict) else None,
-                "tags": seo.get("tags", []) if isinstance(seo, dict) else [],
-                "description": seo.get("description", "") if isinstance(seo, dict) else "",
+                "duration_min": script.get("estimated_duration_minutes"),
+                "word_count": script.get("word_count"),
+                "tags": metadata.get("tags", []),
+                "description": metadata.get("description", ""),
                 "audio_path": data.get("audio_path"),
                 "video_path": data.get("video_path"),
                 "thumbnail_path": data.get("thumbnail_path"),
@@ -708,12 +946,19 @@ async def list_projects():
             })
         except Exception as e:
             logger.warning(f"Could not parse {pkg_file.name}: {e}")
+    return projects
+
+
+@app.get("/projects")
+async def list_projects():
+    """List all completed episode packages from filesystem scan."""
+    projects = await asyncio.to_thread(_scan_projects)
     return {"projects": projects}
 
 
 # ── Background music ──────────────────────────────────────────────────────────
 
-_BG_MUSIC_DIR = Path("./output/bg_music")
+_BG_MUSIC_DIR = Path(settings.output_dir) / "bg_music"
 
 
 def _bg_music_index_path() -> Path:
@@ -736,7 +981,6 @@ async def upload_bg_music(
     name: str = Form(default=""),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Upload a background music track for episode assembly."""
     verify_api_key(x_api_key)
     _BG_MUSIC_DIR.mkdir(parents=True, exist_ok=True)
     music_id = uuid.uuid4().hex[:10]
@@ -818,7 +1062,6 @@ async def _assemble_episode_job(episode_id: str, req: EpisodeAssemblyRequest) ->
     episodes_dir.mkdir(parents=True, exist_ok=True)
     out_path = str(episodes_dir / f"{episode_id}.mp4")
 
-    # Resolve absolute video paths from package files
     video_paths: list[str] = []
     for vid_id in req.video_ids:
         pkg_file = output_root / f"{vid_id}_package.json"
@@ -847,7 +1090,6 @@ async def _assemble_episode_job(episode_id: str, req: EpisodeAssemblyRequest) ->
     try:
         W, H, FPS = 1280, 720, 24
         n = len(video_paths)
-
         inputs: list[str] = []
         for p in video_paths:
             inputs += ["-i", p]
@@ -858,13 +1100,10 @@ async def _assemble_episode_job(episode_id: str, req: EpisodeAssemblyRequest) ->
                 f"[{i}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,"
                 f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={FPS},format=yuv420p[v{i}]"
             )
-            filter_parts.append(
-                f"[{i}:a]volume={req.voice_volume},aresample=44100[a{i}]"
-            )
+            filter_parts.append(f"[{i}:a]volume={req.voice_volume},aresample=44100[a{i}]")
 
         concat_segs = "".join(f"[v{i}][a{i}]" for i in range(n))
         filter_parts.append(f"{concat_segs}concat=n={n}:v=1:a=1[vout][aout]")
-
         v_map, a_map = "vout", "aout"
 
         if req.bg_music_id:
@@ -880,34 +1119,25 @@ async def _assemble_episode_job(episode_id: str, req: EpisodeAssemblyRequest) ->
                 a_map = "final_a"
 
         cmd = [
-            "ffmpeg", "-y",
-            *inputs,
+            "ffmpeg", "-y", *inputs,
             "-filter_complex", ";".join(filter_parts),
-            "-map", f"[{v_map}]",
-            "-map", f"[{a_map}]",
+            "-map", f"[{v_map}]", "-map", f"[{a_map}]",
             "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "192k",
-            "-movflags", "+faststart",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
             out_path,
         ]
 
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
         _, stderr = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(f"FFmpeg error: {stderr.decode()[-3000:]}")
 
         set_episode(episode_id, {
-            "episode_id": episode_id,
-            "status": "complete",
-            "title": req.title,
-            "video_path": f"output/episodes/{episode_id}.mp4",
-            "video_count": n,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "error": None,
+            "episode_id": episode_id, "status": "complete", "title": req.title,
+            "video_path": out_path,
+            "video_count": n, "created_at": datetime.now(timezone.utc).isoformat(), "error": None,
         })
         logger.info(f"Episode {episode_id} assembled: {n} clips → {out_path}")
 
@@ -925,7 +1155,6 @@ async def assemble_episode(
     background_tasks: BackgroundTasks,
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """Assemble multiple completed videos into a long-form episode with optional BG music."""
     verify_api_key(x_api_key)
     if not request.video_ids:
         raise HTTPException(status_code=400, detail="video_ids must not be empty")
@@ -947,44 +1176,66 @@ async def list_episodes_endpoint():
     return {"episodes": all_episodes()}
 
 
-# ── AI Chat (Claude) ──────────────────────────────────────────────────────────
+# ── AI Chat (Groq) ────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     messages: list[dict]
     system: Optional[str] = None
 
 
-_CHAT_SYSTEM = (
-    "You are the RoboModal Studio AI assistant — an expert in AI-powered video content creation. "
-    "You help users plan cinematic storytelling videos, choose the right pipeline settings (models, "
-    "styles, niches, tones), understand results, and craft compelling narratives. "
-    "You are concise, direct, and creative. When suggesting pipeline settings, be specific: name "
-    "exact model choices (Kling v2 Master, Veo3, etc.), cinematic styles, and prompt strategies. "
-    "You have deep knowledge of fal.ai video models, storytelling structure, and YouTube/TikTok content strategy."
+_RALPH_PATH = Path(__file__).parent / "prompts" / "ralph_masterprompt.md"
+_RALPH_FALLBACK = (
+    "You are Ralph, the cinematic storytelling AI embedded in RoboModal Studio. "
+    "You help creators develop story arcs, characters, episode structures, cliffhangers, "
+    "and visual language for serialized AI-generated video. "
+    "You are a showrunner, screenwriter, and pipeline expert in one. "
+    "Be concise, opinionated, and specific. Never suggest monetization or affiliate content. "
+    "Opening line when starting fresh: 'Ralph here. What are we building today?'"
 )
+_ralph_mtime: float = 0.0
+_ralph_content: str = ""
+
+
+def _get_ralph_system() -> str:
+    """Return Ralph's masterprompt, reloading from disk whenever the file changes."""
+    global _ralph_mtime, _ralph_content
+    try:
+        mtime = _RALPH_PATH.stat().st_mtime
+        if mtime != _ralph_mtime:
+            _ralph_content = _RALPH_PATH.read_text()
+            _ralph_mtime = mtime
+    except FileNotFoundError:
+        if not _ralph_content:
+            _ralph_content = _RALPH_FALLBACK
+    return _ralph_content
 
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    """Stream a Claude response for the in-dashboard AI assistant."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not set in environment")
+    """Stream a Groq response for the in-dashboard AI storytelling assistant."""
+    from groq import AsyncGroq
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
-    system_prompt = request.system or _CHAT_SYSTEM
+    api_key = settings.groq_api_key
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not set in environment")
+
+    client = AsyncGroq(api_key=api_key)
+    system_prompt = request.system or _get_ralph_system()
+    messages = [{"role": "system", "content": system_prompt}] + list(request.messages)
 
     async def generate():
         try:
-            async with client.messages.stream(
-                model="claude-sonnet-4-6",
+            stream = await client.chat.completions.create(
+                model=settings.groq_model,
                 max_tokens=2048,
-                system=system_prompt,
-                messages=request.messages,
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
-                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                messages=messages,
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield f"data: {json.dumps({'type': 'text', 'content': delta})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 

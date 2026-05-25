@@ -1,19 +1,23 @@
 from pipeline.models import (
     VideoPackage,
     Script,
-    ResearchResult,
+    ScriptSection,
+    EpisodeBrief,
     VoiceSpec,
-    SEOPackage,
     ThumbnailConcept,
-    AffiliateInsertion,
+    EpisodeMetadata,
+    Series,
+    Character,
 )
 
 __all__ = [
     "VideoPackage",
     "Script",
-    "ResearchResult",
+    "ScriptSection",
+    "EpisodeBrief",
     "VoiceSpec",
-    "SEOPackage",
     "ThumbnailConcept",
-    "AffiliateInsertion",
+    "EpisodeMetadata",
+    "Series",
+    "Character",
 ]

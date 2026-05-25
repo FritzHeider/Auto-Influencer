@@ -18,11 +18,15 @@ logger = logging.getLogger(__name__)
 ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 TTS_CHUNK_SIZE = 4000  # OpenAI TTS hard limit is 4096 chars
 
+_openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+_voice_spec_cache: dict[tuple[str, str, str], VoiceSpec] = {}
+
 
 def strip_script_markup(text: str) -> str:
-    """Remove [PAUSE], [EMPHASIS], [BROLL:...], [AFFILIATE:...] markup for TTS."""
-    cleaned = re.sub(r"\[BROLL:[^\]]+\]", "", text)
-    cleaned = re.sub(r"\[AFFILIATE:[^\]]+\]", "", cleaned)
+    """Remove cinematic markup tags for TTS — keep only spoken words."""
+    cleaned = re.sub(r"\[BROLL:.*?\]", "", text, flags=re.DOTALL)
+    cleaned = re.sub(r"\[SHOT:.*?\]", "", cleaned, flags=re.DOTALL)
+    cleaned = re.sub(r"\[MOOD:.*?\]", "", cleaned, flags=re.DOTALL)
     cleaned = re.sub(r"\[EMPHASIS\]", "", cleaned)
     cleaned = re.sub(r"\[PAUSE\]", "...", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
@@ -37,7 +41,14 @@ def chunk_text(text: str, max_chars: int = TTS_CHUNK_SIZE) -> list[str]:
     sentences = re.split(r"(?<=[.!?])\s+", text)
     chunks, current, current_len = [], [], 0
     for sentence in sentences:
-        if current and current_len + len(sentence) + 1 > max_chars:
+        if len(sentence) > max_chars:
+            # Hard-split oversized sentences at word boundaries
+            if current:
+                chunks.append(" ".join(current))
+                current, current_len = [], 0
+            for i in range(0, len(sentence), max_chars):
+                chunks.append(sentence[i : i + max_chars])
+        elif current and current_len + len(sentence) + 1 > max_chars:
             chunks.append(" ".join(current))
             current, current_len = [sentence], len(sentence)
         else:
@@ -69,18 +80,21 @@ def concat_audio(input_paths: list[Path], output_path: Path) -> bool:
         concat_list.unlink(missing_ok=True)
 
 
-async def select_voice_spec(niche: str, tone: str, demographic: str, duration: float) -> VoiceSpec:
-    """Use OpenAI to select optimal voice settings for this content."""
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+async def select_voice_spec(genre: str, tone: str, narration_style: str, duration: float) -> VoiceSpec:
+    """Use OpenAI to select optimal narrator voice for this episode."""
+    cache_key = (genre, tone, narration_style)
+    if cache_key in _voice_spec_cache:
+        logger.info(f"Voice spec cache hit: {genre}/{tone}/{narration_style}")
+        return _voice_spec_cache[cache_key]
 
     prompt = VOICE_SPEC_PROMPT.format(
-        niche=niche,
+        genre=genre,
         tone=tone,
-        demographic=demographic,
+        narration_style=narration_style,
         duration=f"{duration:.1f}",
     )
 
-    response = await client.chat.completions.create(
+    response = await _openai_client.chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": "Respond only with valid JSON. No markdown."},
@@ -92,13 +106,15 @@ async def select_voice_spec(niche: str, tone: str, demographic: str, duration: f
     )
 
     data = json.loads(response.choices[0].message.content)
-    return VoiceSpec(**{k: v for k, v in data.items() if k not in ("rationale", "voice_description")})
+    spec = VoiceSpec(**{k: v for k, v in data.items() if k not in ("rationale", "voice_description")})
+    _voice_spec_cache[cache_key] = spec
+    return spec
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
-async def _generate_openai_chunk(client: AsyncOpenAI, text: str, voice_spec: VoiceSpec, path: Path) -> bool:
+async def _generate_openai_chunk(text: str, voice_spec: VoiceSpec, path: Path) -> bool:
     try:
-        response = await client.audio.speech.create(
+        response = await _openai_client.audio.speech.create(
             model=voice_spec.openai_model,
             voice=voice_spec.voice_id,
             input=text,
@@ -113,11 +129,10 @@ async def _generate_openai_chunk(client: AsyncOpenAI, text: str, voice_spec: Voi
 
 async def generate_openai_audio(text: str, voice_spec: VoiceSpec, output_path: Path) -> bool:
     """Generate audio via OpenAI TTS, chunking at sentence boundaries if needed."""
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
     chunks = chunk_text(text)
 
     if len(chunks) == 1:
-        ok = await _generate_openai_chunk(client, chunks[0], voice_spec, output_path)
+        ok = await _generate_openai_chunk(chunks[0], voice_spec, output_path)
         if ok:
             logger.info(f"OpenAI TTS audio saved: {output_path}")
         return ok
@@ -125,7 +140,7 @@ async def generate_openai_audio(text: str, voice_spec: VoiceSpec, output_path: P
     logger.info(f"Script exceeds {TTS_CHUNK_SIZE} chars — generating {len(chunks)} chunks")
     chunk_paths = [output_path.parent / f"{output_path.stem}_chunk{i}.mp3" for i in range(len(chunks))]
     results = await asyncio.gather(*[
-        _generate_openai_chunk(client, chunk, voice_spec, path)
+        _generate_openai_chunk(chunk, voice_spec, path)
         for chunk, path in zip(chunks, chunk_paths)
     ])
 
@@ -210,9 +225,9 @@ def post_process_audio(input_path: Path, output_path: Path, lufs: float = -14.0)
 
 async def generate_voiceover(
     script: Script,
-    niche: str,
+    genre: str,
     tone: str,
-    demographic: str,
+    narration_style: str,
     video_id: str,
     voice_id_override: str | None = None,
 ) -> tuple[VoiceSpec, str]:
@@ -228,7 +243,7 @@ async def generate_voiceover(
         )
         logger.info(f"Using voice override: {voice_id_override}")
     else:
-        voice_spec = await select_voice_spec(niche, tone, demographic, script.estimated_duration_minutes)
+        voice_spec = await select_voice_spec(genre, tone, narration_style, script.estimated_duration_minutes)
         logger.info(f"Selected voice: {voice_spec.voice_name} via {voice_spec.provider}")
 
     clean_text = strip_script_markup(script.full_text)
@@ -246,7 +261,7 @@ async def generate_voiceover(
     if not success:
         raise RuntimeError(f"All TTS providers failed for video {video_id}")
 
-    post_process_audio(raw_path, final_path, lufs=voice_spec.ffmpeg_loudness_lufs)
+    await asyncio.to_thread(post_process_audio, raw_path, final_path, voice_spec.ffmpeg_loudness_lufs)
     raw_path.unlink(missing_ok=True)
 
     return voice_spec, str(final_path)

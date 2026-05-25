@@ -1,139 +1,124 @@
-RESEARCH_PROMPT = """You are a viral content strategist for a faceless {niche} YouTube channel.
+STORY_BRIEF_PROMPT = """You are a cinematic story architect for serialized AI-generated video episodes.
 
-STEP 1 — TREND RESEARCH:
-Research the top 5 trending topics in {niche} right now. For each topic output:
-- topic_title: string
-- search_volume_signal: high / medium / low
-- competition_level: saturated / moderate / untapped
-- monetization_potential: high / medium / low
-- trending_reason: 1 sentence
-- score: float 0-10 (weighted: monetization 40%, competition 30%, volume 30%)
+Series: {series_title}
+Genre: {genre}
+Tone: {tone}
+World context: {world_notes}
+Characters available: {characters}
+Previously on (last episode cliffhanger): {previously_on}
+Creative direction from creator: {story_prompt}
 
-STEP 2 — HOOK GENERATION:
-For the #1 scored topic, generate 7 opening hooks optimized for YouTube retention.
-Each hook must:
-- Be 15-25 words
-- Create curiosity gap or fear of missing out
-- Not reveal the full answer
-- Be written for spoken delivery
+Generate the concept for Episode {episode_number}.
 
-Score each hook on: curiosity (C 0-10), emotional pull (E 0-10), specificity (S 0-10).
-total_score = (C * 0.4) + (E * 0.35) + (S * 0.25)
-
-Select the winning hook. Explain why in one sentence.
-
-Recent search context:
-{bing_context}
-
-Recently used topics (do NOT select any topic that is the same as or closely similar to these):
-{used_topics}
-
-Respond ONLY with valid JSON matching this exact schema:
-{{
-  "trends": [
-    {{
-      "topic_title": "string",
-      "search_volume_signal": "high|medium|low",
-      "competition_level": "saturated|moderate|untapped",
-      "monetization_potential": "high|medium|low",
-      "trending_reason": "string",
-      "score": 0.0
-    }}
-  ],
-  "selected_topic": {{ same as above }},
-  "hooks": [
-    {{
-      "text": "string",
-      "curiosity_score": 0.0,
-      "emotional_score": 0.0,
-      "specificity_score": 0.0,
-      "total_score": 0.0
-    }}
-  ],
-  "winning_hook": "string",
-  "selection_rationale": "string"
-}}"""
-
-
-SCRIPT_PROMPT = """You are a professional YouTube scriptwriter for a faceless {niche} channel.
-
-Channel tone: {tone}
-Target audience: {demographic}
-Topic: {topic}
-Winning hook: {hook}
-Target length: 8-12 minutes spoken (approx 1200-1600 words)
-Affiliate products to include naturally: {affiliate_products}
-
-SCRIPT STRUCTURE:
-[00:00-00:08] HOOK — use the winning hook verbatim
-[00:08-01:30] OPEN LOOP — expand the problem/mystery, do not resolve yet
-[01:30-04:00] SECTION 1 — first major point with story or data
-[04:00-07:00] SECTION 2 — second major point + pattern interrupt
-[07:00-09:30] SECTION 3 — third major point + affiliate insertion
-[09:30-10:30] RESOLUTION — close the open loop from the intro
-[10:30-11:00] CTA — organic subscribe + next video tease
-
-SCRIPT MARKUP RULES:
-- Mark [PAUSE] where a 0.5s silence should be inserted
-- Mark [EMPHASIS] on words needing vocal stress
-- Mark [BROLL: description] at every visual cue change
-- Mark [AFFILIATE: product name] at natural insertion points
-- Write for ears not eyes — short sentences, conversational fragments ok
-- Pattern interrupt required at 30%, 60%, and 90% of script length
-- Never reference AI generation
+Produce:
+1. episode_concept — compelling 2-3 sentence episode premise
+2. opening_hook — cinematic spoken hook (15-25 words) designed to arrest attention immediately
+3. key_beats — exactly 5 major story moments that carry the episode arc
+4. themes — 2-3 central themes explored this episode
+5. character_focus — which characters are featured and what drives them
+6. cliffhanger — the episode-ending revelation or unresolved tension that demands a next episode
+7. previously_on — a "Previously on [series]..." recap paragraph (empty string if episode 1)
 
 Respond ONLY with valid JSON:
 {{
-  "topic": "string",
-  "hook": "string",
-  "sections": [
-    {{
-      "timestamp_start": "00:00",
-      "timestamp_end": "00:08",
-      "label": "HOOK",
-      "content": "full spoken content with markup",
-      "broll_cues": ["description1", "description2"],
-      "affiliate_insertions": []
-    }}
-  ],
-  "full_text": "complete script as single string with all markup",
-  "word_count": 0,
-  "estimated_duration_minutes": 0.0,
-  "affiliate_products": ["product1"]
+  "episode_concept": "string",
+  "opening_hook": "string",
+  "key_beats": ["beat1", "beat2", "beat3", "beat4", "beat5"],
+  "themes": ["theme1", "theme2"],
+  "character_focus": ["character name"],
+  "cliffhanger": "string",
+  "previously_on": "string"
 }}"""
 
 
-VOICE_SPEC_PROMPT = """You are an audio production engineer specializing in AI voiceover for YouTube.
+EPISODE_SCRIPT_PROMPT = """You are a cinematic screenwriter for serialized AI-generated video episodes.
 
-Channel niche: {niche}
-Script tone: {tone}
-Target demographic: {demographic}
-Estimated video length: {duration} minutes
+Series: {series_title}
+Genre: {genre}
+Tone: {tone}
+Narration style: {narration_style}
+Episode number: {episode_number}
+Episode concept: {episode_concept}
+Opening hook: {opening_hook}
+Key story beats: {key_beats}
+Characters in this episode: {characters}
+Visual style prefix: {visual_style}
+Color grade: {color_grade}
+Music mood: {music_mood}
+Target length: 8-12 minutes spoken (~1400-1800 words)
 
-Select the optimal OpenAI TTS voice for this content profile.
-Consider: authority level, age perception, accent neutrality, pacing.
+CINEMATIC EPISODE STRUCTURE:
+[00:00-00:20] COLD_OPEN — drop into action or atmosphere; use the opening hook verbatim
+[00:20-02:00] ACT_1 — establish episode conflict, world, character stakes
+[02:00-05:00] ACT_2 — escalation, complications, revelations, character development
+[05:00-08:30] ACT_3 — tension peaks, stakes raised, character tested
+[08:30-10:00] CLIMAX — central confrontation, revelation, or turning point
+[10:00-10:45] DENOUEMENT — partial resolution; world is changed by what happened
+[10:45-11:00] CLIFFHANGER — unresolved tension or revelation; tease next episode
+
+MARKUP RULES:
+- [PAUSE] for dramatic 0.5s silence
+- [EMPHASIS] on key narrative words
+- [BROLL: vivid scene description] at every visual change — be specific: lighting, atmosphere, camera position
+- [SHOT: type] before major scenes — WIDE ESTABLISHING | CLOSE-UP | TRACKING | AERIAL | HANDHELD | STATIC
+- [MOOD: emotion] for atmospheric score notes — TENSE | HOPEFUL | MELANCHOLIC | TRIUMPHANT | MYSTERIOUS
+- Write for ears and cinematic imagination
+- No affiliate content, no product mentions, no calls to subscribe
+- Each broll cue must be a vivid, specific cinematic description the video model can visualize
+
+Respond ONLY with valid JSON:
+{{
+  "episode_title": "string",
+  "episode_number": {episode_number},
+  "series_title": "{series_title}",
+  "opening_hook": "string",
+  "sections": [
+    {{
+      "timestamp_start": "00:00",
+      "timestamp_end": "00:20",
+      "label": "COLD_OPEN",
+      "content": "spoken content with markup",
+      "broll_cues": ["vivid cinematic scene description"],
+      "shot_types": ["WIDE ESTABLISHING"],
+      "characters_present": ["character name"],
+      "mood": "mysterious"
+    }}
+  ],
+  "full_text": "complete script as single string",
+  "word_count": 0,
+  "estimated_duration_minutes": 0.0,
+  "narration_style": "{narration_style}",
+  "cliffhanger": "string"
+}}"""
+
+
+VOICE_SPEC_PROMPT = """You are an audio director for cinematic serialized video episodes.
+
+Genre: {genre}
+Tone: {tone}
+Narration style: {narration_style}
+Episode length: {duration} minutes
+
+Select the optimal narrator voice. Consider genre atmosphere, emotional depth, and narrative role.
 
 Available OpenAI voices:
 - alloy — neutral, balanced, American
 - ash — clear, confident male, American
 - coral — warm, engaging female, American
-- echo — measured, calm male, American
-- fable — expressive, storytelling male, British
+- echo — measured, calm male, American — good for thriller/drama
+- fable — expressive, storytelling male, British — best for epic/fantasy
 - nova — energetic, upbeat female, American
-- onyx — deep, authoritative male, American
-- sage — wise, thoughtful, American
+- onyx — deep, authoritative male, American — best for dark/tense content
+- sage — wise, thoughtful, American — best for mystery/documentary
 - shimmer — soft, friendly female, American
 
-Use "tts-1-hd" for best quality. Set speed between 0.9-1.1 (1.0 is normal).
-
-voice_id and voice_name must be the exact voice identifier (e.g. "onyx"), not a description.
+Use "tts-1-hd". Set speed 0.88-1.05 (slower for dramatic/dark content).
 
 Respond ONLY with valid JSON:
 {{
   "provider": "openai",
   "voice_id": "string",
   "voice_name": "string",
-  "voice_description": "human-readable description e.g. deep authoritative male",
   "openai_model": "tts-1-hd",
   "speed": 1.0,
   "ffmpeg_loudness_lufs": -14.0,
@@ -142,16 +127,18 @@ Respond ONLY with valid JSON:
 }}"""
 
 
-THUMBNAIL_PROMPT = """You are a YouTube thumbnail designer. You have studied the top 1000 highest CTR thumbnails in {niche}.
+COVER_ART_PROMPT = """You are a cinematic title card and episode cover art designer.
 
-Video title: {title}
-Hook: {hook}
-Target emotion: curiosity
-Channel: faceless (no human faces in thumbnails)
-Niche: {niche}
+Series: {series_title}
+Episode title: {episode_title}
+Episode number: {episode_number}
+Genre: {genre}
+Visual style: {visual_style}
+Opening hook: {hook}
+Themes: {themes}
 
-Generate 3 thumbnail concepts. For each concept the Fireworks image prompt must be detailed enough
-to generate a compelling, high-CTR 1280x720 YouTube thumbnail without a human face.
+Generate 3 cover art concepts. Each should feel like a premium streaming series thumbnail or film poster.
+Cinematic, atmospheric, emotionally evocative. No real human faces — use silhouettes, environments, symbols, abstraction.
 
 Respond ONLY with valid JSON:
 {{
@@ -159,11 +146,11 @@ Respond ONLY with valid JSON:
     {{
       "concept_id": 1,
       "layout_description": "string",
-      "focal_element": "string (no faces)",
-      "text_overlay": "max 4 words",
-      "accent_elements": ["string"],
+      "focal_element": "string — no faces, use silhouettes/environments/symbols",
+      "text_overlay": "max 5 words — episode title or key phrase",
+      "accent_elements": ["element"],
       "color_mood": "string",
-      "image_prompt": "detailed 150-200 word image generation prompt, style photorealistic, 1344x768, no human faces, no text, no logos, no watermarks",
+      "image_prompt": "detailed 150-200 word cinematic image generation prompt, photorealistic film still quality, anamorphic lens, no text, no logos, no watermarks, no human faces",
       "ctr_score": 0.0,
       "is_winner": false
     }}
@@ -173,52 +160,29 @@ Respond ONLY with valid JSON:
 Set is_winner: true on the highest ctr_score concept only."""
 
 
-SEO_PROMPT = """You are a YouTube SEO specialist for a {niche} channel.
+EPISODE_METADATA_PROMPT = """You are a content strategist for a cinematic serialized video series.
 
-Video topic: {topic}
-Hook: {hook}
+Series: {series_title}
+Episode title: {episode_title}
+Episode number: {episode_number}
+Genre: {genre}
 Script summary: {script_summary}
-Target demographic: {demographic}
+Themes: {themes}
+Cliffhanger: {cliffhanger}
 
-Generate a complete SEO package.
+Generate episode metadata for YouTube/streaming distribution.
 
 Respond ONLY with valid JSON:
 {{
-  "title": "string (60 chars max, include primary keyword near start)",
-  "description": "string (200 words, first 2 sentences hook, include timestamps, affiliate disclaimer, subscribe CTA)",
-  "tags": ["tag1", "tag2"],
-  "chapters": [
-    "00:00 Introduction",
-    "01:30 Section title"
-  ]
+  "title": "string (70 chars max — series name + Ep N + episode title)",
+  "description": "string (200-300 words — atmospheric opening, episode synopsis, series context, no ads, no affiliate links)",
+  "tags": ["tag1"],
+  "chapters": ["00:00 Cold Open", "00:20 Act 1"],
+  "synopsis": "string (2-3 sentences, TV Guide style, present tense)"
 }}
 
 Rules:
-- title: no clickbait, must match content, number or bracket format when possible
-- description: include 3-5 natural keyword variations
-- tags: exactly 15 tags, mix of broad and long-tail, no spaces in individual tags replaced with underscores
-- chapters: match script section timestamps"""
-
-
-AFFILIATE_PROMPT = """You are a YouTube monetization strategist for a {niche} channel.
-
-Script topic: {topic}
-Script sections: {script_sections}
-Affiliate insertion points already marked: {existing_insertions}
-
-Identify the top 3 affiliate products that fit naturally into this content.
-Choose products with: high commission rates, audience relevance, reputable programs.
-
-Respond ONLY with valid JSON:
-{{
-  "affiliates": [
-    {{
-      "product_name": "string",
-      "program": "Amazon Associates | ShareASale | Impact | CJ | Direct",
-      "commission_rate": "string e.g. 3-8%",
-      "script_line": "15-20 word natural spoken insertion that doesn't sound like an ad",
-      "description_placement": "full description line including tracking link placeholder [LINK]",
-      "disclosure": "FTC-compliant disclosure line"
-    }}
-  ]
-}}"""
+- title: include series name, episode number, episode title
+- description: cinematic, builds anticipation, ends with series hook
+- tags: 15 tags mixing genre, series name, themes, cinematic keywords
+- chapters: match script section timestamps exactly"""
