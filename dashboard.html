@@ -209,7 +209,7 @@
   .text-input:focus { border-color: #3b82f6; background: rgba(59,130,246,0.05); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
   textarea.text-input { resize: vertical; min-height: 64px; }
 
-  /* ── Niche chips ───────────────────────────────── */
+  /* ── Filter chips ──────────────────────────────── */
   .chip-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
   .chip { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: var(--surface); border: 1px solid var(--border); cursor: pointer; color: var(--fg-muted); transition: all 0.15s var(--ease); }
   .chip:hover { border-color: var(--border-bright); color: var(--fg); }
@@ -329,8 +329,10 @@
   .status-running  .sb-dot { background: #3b82f6; animation: sb-pulse 1s ease-in-out infinite; }
   .status-complete { background: rgba(34,197,94,0.1);   color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
   .status-complete .sb-dot { background: #22c55e; }
-  .status-failed   { background: rgba(239,68,68,0.1);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
-  .status-failed   .sb-dot { background: #ef4444; }
+  .status-failed    { background: rgba(239,68,68,0.1);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .status-failed    .sb-dot { background: #ef4444; }
+  .status-cancelled { background: rgba(100,100,120,0.1); color: #94a3b8; border: 1px solid rgba(100,100,120,0.25); }
+  .status-cancelled .sb-dot { background: #64748b; }
   @keyframes sb-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
 
   /* ── Job meta strip ────────────────────────────── */
@@ -626,6 +628,15 @@
   .chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-muted); animation: typing-dot 1.2s ease-in-out infinite; }
   .chat-typing span:nth-child(2) { animation-delay: 0.15s; }
   .chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+  /* ── Chat setup card ────────────────────────────── */
+  .setup-card { background: rgba(59,130,246,0.07); border: 1px solid rgba(59,130,246,0.25); border-radius: var(--radius); margin-top: 10px; overflow: hidden; }
+  .setup-card-header { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(59,130,246,0.12); font-size: 12px; font-weight: 700; color: #93c5fd; }
+  .setup-card-rows { display: flex; flex-direction: column; padding: 6px 0; }
+  .setup-card-row { display: flex; gap: 10px; padding: 3px 12px; }
+  .setup-key { font-size: 11px; color: var(--fg-dim); min-width: 72px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
+  .setup-val { font-size: 12px; color: var(--fg); }
+  .inline-code { font-family: monospace; font-size: 12px; background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; }
   @keyframes typing-dot { 0%,80%,100% { transform: scale(0.7); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
   .chat-suggestion { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .chat-sugg-btn {
@@ -664,7 +675,7 @@
       </div>
       <div>
         <div class="brand-name">RoboModal Studio</div>
-        <div class="brand-sub">AI Content Engine</div>
+        <div class="brand-sub">Cinematic Episode Studio</div>
       </div>
     </div>
     <div class="header-right">
@@ -840,21 +851,24 @@
       </div>
     </div>
 
-    <!-- Topic / Niche -->
+    <!-- Story Prompt -->
     <div>
       <div class="field-wrap">
-        <label class="field-label" for="topic-input">Topic / Niche Override</label>
-        <input id="topic-input" class="text-input" type="text" placeholder="e.g. 5 ways to pay off debt faster" autocomplete="off" oninput="updateCost()">
+        <label class="field-label" for="story-prompt">Story Direction</label>
+        <textarea id="story-prompt" class="text-input" rows="3" placeholder="Describe the episode concept, key conflict, or creative direction… (leave blank for AI to decide)" oninput="updateCost()"></textarea>
       </div>
-      <div class="chip-grid" role="group" aria-label="Preset niches">
-        <div class="chip" onclick="setNiche('Personal Finance')">Personal Finance</div>
-        <div class="chip" onclick="setNiche('Tech')">Tech</div>
-        <div class="chip" onclick="setNiche('Health & Wellness')">Health</div>
-        <div class="chip" onclick="setNiche('Self-Improvement')">Self-Improvement</div>
-        <div class="chip" onclick="setNiche('Crypto')">Crypto</div>
-        <div class="chip" onclick="setNiche('AI & Future')">AI & Future</div>
-        <div class="chip" onclick="setNiche('Business')">Business</div>
-        <div class="chip" onclick="setNiche('Travel')">Travel</div>
+    </div>
+
+    <!-- Genre -->
+    <div>
+      <div class="section-label">Genre</div>
+      <div class="pill-row" role="group">
+        <div class="sel-pill selected" data-val="drama" onclick="selectPill(this,'genre')" tabindex="0">Drama</div>
+        <div class="sel-pill" data-val="thriller" onclick="selectPill(this,'genre')" tabindex="0">Thriller</div>
+        <div class="sel-pill" data-val="sci-fi" onclick="selectPill(this,'genre')" tabindex="0">Sci-Fi</div>
+        <div class="sel-pill" data-val="fantasy" onclick="selectPill(this,'genre')" tabindex="0">Fantasy</div>
+        <div class="sel-pill" data-val="horror" onclick="selectPill(this,'genre')" tabindex="0">Horror</div>
+        <div class="sel-pill" data-val="documentary" onclick="selectPill(this,'genre')" tabindex="0">Documentary</div>
       </div>
     </div>
 
@@ -862,26 +876,35 @@
     <div>
       <div class="section-label">Tone</div>
       <div class="pill-row" role="group">
-        <div class="sel-pill selected" data-val="authoritative" onclick="selectPill(this,'tone')" tabindex="0">Authoritative</div>
-        <div class="sel-pill" data-val="casual" onclick="selectPill(this,'tone')" tabindex="0">Casual</div>
-        <div class="sel-pill" data-val="educational" onclick="selectPill(this,'tone')" tabindex="0">Educational</div>
-        <div class="sel-pill" data-val="energetic" onclick="selectPill(this,'tone')" tabindex="0">Energetic</div>
-        <div class="sel-pill" data-val="calm" onclick="selectPill(this,'tone')" tabindex="0">Calm</div>
-        <div class="sel-pill" data-val="storytelling" onclick="selectPill(this,'tone')" tabindex="0">Storytelling</div>
+        <div class="sel-pill selected" data-val="cinematic" onclick="selectPill(this,'tone')" tabindex="0">Cinematic</div>
+        <div class="sel-pill" data-val="dark" onclick="selectPill(this,'tone')" tabindex="0">Dark</div>
+        <div class="sel-pill" data-val="epic" onclick="selectPill(this,'tone')" tabindex="0">Epic</div>
+        <div class="sel-pill" data-val="tense" onclick="selectPill(this,'tone')" tabindex="0">Tense</div>
+        <div class="sel-pill" data-val="mysterious" onclick="selectPill(this,'tone')" tabindex="0">Mysterious</div>
+        <div class="sel-pill" data-val="uplifting" onclick="selectPill(this,'tone')" tabindex="0">Uplifting</div>
       </div>
     </div>
 
-    <!-- Demographic -->
+    <!-- Series & Episode -->
     <div>
-      <div class="field-wrap">
-        <label class="field-label" for="demo-input">Target Demographic</label>
-        <input id="demo-input" class="text-input" type="text" value="25-45 year old professionals">
+      <div class="section-label">Series & Episode</div>
+      <div class="field-wrap" style="margin-bottom:8px;">
+        <label class="field-label" for="series-title">Series Title</label>
+        <input id="series-title" class="text-input" type="text" placeholder="e.g. Night City, Stellar Drift, The Iron Crown" autocomplete="off" oninput="state.seriesTitle=this.value.trim()">
       </div>
-      <div class="chip-grid" style="margin-top:8px;">
-        <div class="chip" onclick="setDemo('18-24 Gen Z')">Gen Z · 18–24</div>
-        <div class="chip" onclick="setDemo('25-40 Millennials')">Millennials</div>
-        <div class="chip" onclick="setDemo('41-55 Gen X')">Gen X</div>
-        <div class="chip" onclick="setDemo('all ages broad audience')">Broad</div>
+      <div style="display:flex;gap:8px;">
+        <div class="field-wrap" style="flex:1;">
+          <label class="field-label" for="episode-number">Episode #</label>
+          <input id="episode-number" class="text-input" type="number" min="1" value="1" oninput="state.episodeNumber=parseInt(this.value)||1">
+        </div>
+        <div class="field-wrap" style="flex:2;">
+          <label class="field-label" for="narration-style">Narration Style</label>
+          <select id="narration-style" class="text-input" onchange="state.narrationStyle=this.value">
+            <option value="third_person">Third Person</option>
+            <option value="first_person">First Person</option>
+            <option value="omniscient">Omniscient</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -1098,6 +1121,18 @@
           </div>
         </div>
 
+        <!-- Previously On -->
+        <div class="field-wrap">
+          <label class="field-label" for="previously-on">Previously On… (recap)</label>
+          <textarea id="previously-on" class="text-input" rows="2" placeholder="Last episode cliffhanger or recap for continuity (auto-filled from series if set)" oninput="state.previouslyOn=this.value.trim()"></textarea>
+        </div>
+
+        <!-- World Notes -->
+        <div class="field-wrap">
+          <label class="field-label" for="world-notes">World Notes</label>
+          <textarea id="world-notes" class="text-input" rows="2" placeholder="Setting rules, lore, or universe context passed to every episode prompt…" oninput="state.worldNotes=this.value.trim()"></textarea>
+        </div>
+
         <!-- Webhook Callback -->
         <div class="field-wrap">
           <label class="field-label" for="webhook-input">Webhook Callback URL</label>
@@ -1123,8 +1158,8 @@
           <input type="range" id="batch-count" min="2" max="10" value="3" oninput="document.getElementById('batch-val').textContent=this.value;updateCost()">
         </div>
         <div class="field-wrap" style="margin-top:10px;">
-          <label class="field-label" for="batch-topics">Topic list (one per line, optional)</label>
-          <textarea id="batch-topics" class="text-input" rows="3" placeholder="Topic 1&#10;Topic 2&#10;Topic 3"></textarea>
+          <label class="field-label" for="batch-topics">Episode directions (one per line, optional)</label>
+          <textarea id="batch-topics" class="text-input" rows="3" placeholder="A detective discovers the tip was planted&#10;The city loses power for 72 hours&#10;Final confrontation at the docks"></textarea>
         </div>
       </div>
     </div>
@@ -1134,7 +1169,7 @@
       <div class="btn-inner">
         <div class="btn-spinner"></div>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        <span class="btn-text">Generate Video</span>
+        <span class="btn-text">Generate Episode</span>
       </div>
     </button>
 
@@ -1267,15 +1302,15 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
           <div class="chat-bubble">
-            Hi! I'm your RoboModal Studio assistant. I can help you plan cinematic storytelling videos, choose models and settings, craft B-roll strategies, and make creative decisions.<br><br>What kind of video are you making today?
+            Ralph here. What are we building — new series, next episode, or a story problem to solve?<br><br>Say <strong>Setup Wizard</strong> and I'll ask a few questions then apply the settings to your studio automatically.
           </div>
         </div>
       </div>
       <div class="chat-suggestion" id="chat-suggestions">
+        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">🎬 Setup Wizard — plan my next episode</button>
         <button class="chat-sugg-btn" onclick="sendSuggestion(this)">What video model should I use?</button>
-        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">Help me plan a 5-min finance video</button>
-        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">Best cinematic style for tech content</button>
-        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">How do I make an episode?</button>
+        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">Recommend voice + model for thriller</button>
+        <button class="chat-sugg-btn" onclick="sendSuggestion(this)">Help me write a cliffhanger</button>
       </div>
       <div class="chat-input-wrap">
         <textarea id="chat-input" class="chat-input" rows="1" placeholder="Ask anything about your video strategy…" onkeydown="chatKeyDown(event)" oninput="autoResizeChat(this)"></textarea>
@@ -1322,22 +1357,28 @@ applyTheme(currentTheme);
 
 /* ─── State ─────────────────────────────────────────── */
 const state = {
-  videoModel:       'fal-ai/kling-video/v2/master/text-to-video',
-  thumbnailModel:   'fal-ai/flux/dev',
-  contentModel:     'gpt-4o',
-  avatarModel:      'fal-ai/sadtalker',
-  length:           'medium',
-  tone:             'authoritative',
-  sceneStyle:       '',
-  voiceId:          '',
-  avatarId:         null,
-  refMediaId:       null,
-  transition:       'cut',
-  cardStyle:        'pillow',
-  cinematicStyle:   '',
+  videoModel:        'fal-ai/kling-video/v2/master/text-to-video',
+  thumbnailModel:    'fal-ai/flux/dev',
+  contentModel:      'gpt-4o',
+  avatarModel:       'fal-ai/sadtalker',
+  length:            'medium',
+  genre:             'drama',
+  tone:              'cinematic',
+  seriesTitle:       '',
+  episodeNumber:     1,
+  narrationStyle:    'third_person',
+  previouslyOn:      '',
+  worldNotes:        '',
+  sceneStyle:        '',
+  voiceId:           '',
+  avatarId:          null,
+  refMediaId:        null,
+  transition:        'cut',
+  cardStyle:         'pillow',
+  cinematicStyle:    '',
   referenceAllClips: false,
-  pollers:          {},
-  allJobs:          {},
+  pollers:           {},
+  allJobs:           {},
 };
 
 const API = 'http://localhost:8000';
@@ -1390,6 +1431,7 @@ function selectPill(el, group) {
   el.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected'));
   el.classList.add('selected');
   if (group === 'length')     state.length     = el.dataset.val;
+  if (group === 'genre')      state.genre      = el.dataset.val;
   if (group === 'tone')       state.tone       = el.dataset.val;
   if (group === 'scene')      state.sceneStyle = el.dataset.val;
   if (group === 'transition') {
@@ -1487,7 +1529,7 @@ function renderAvatarGallery(avatars) {
   const genBtn = `<div class="avatar-gen-btn${avatarGenerating ? ' spinning' : ''}" id="avatar-gen-btn" onclick="generateAvatar()" title="Generate new avatar">${avatarGenerating ? '⟳' : '+'}</div>`;
   const thumbs = avatars.map(av => {
     const sel = state.avatarId === av.avatar_id ? ' selected' : '';
-    return `<div class="avatar-thumb${sel}" onclick="selectAvatar('${av.avatar_id}', this)" title="${esc(av.niche)}">
+    return `<div class="avatar-thumb${sel}" onclick="selectAvatar('${av.avatar_id}', this)" title="${esc(av.genre || av.description || av.avatar_id)}">
       <img src="${API}/files/avatars/${av.avatar_id}.jpg" alt="Avatar" loading="lazy">
       <div class="av-del" onclick="deleteAvatar('${av.avatar_id}', event)">×</div>
     </div>`;
@@ -1504,14 +1546,14 @@ function selectAvatar(id, el) {
 
 async function generateAvatar() {
   if (avatarGenerating) return;
-  const niche = document.getElementById('topic-input').value.trim() || 'content creator';
+  const genre = state.genre || document.getElementById('series-title').value.trim() || 'drama';
   avatarGenerating = true;
   renderAvatarGallery([]); // triggers spinner
   try {
     const res = await fetch(`${API}/avatars`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ niche }),
+      body: JSON.stringify({ genre }),
     });
     if (!res.ok) throw new Error(await res.text());
     toast('Avatar generated', 'success');
@@ -1705,13 +1747,15 @@ function updateTransitionNote() {
   }
 }
 
-/* ─── Niche / Demo shortcuts ────────────────────────── */
-function setNiche(val) {
-  document.getElementById('topic-input').value = val;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
+/* ─── Cinematic style presets helpers ──────────────── */
+function setGenre(val) {
+  state.genre = val;
+  document.querySelectorAll('[data-val]').forEach(p => {
+    if (['drama','thriller','sci-fi','fantasy','horror','documentary'].includes(p.dataset.val)) {
+      p.classList.toggle('selected', p.dataset.val === val);
+    }
+  });
 }
-function setDemo(val) { document.getElementById('demo-input').value = val; }
 
 /* ─── Batch toggle ──────────────────────────────────── */
 function toggleBatch(el) {
@@ -1724,65 +1768,83 @@ async function generateVideo() {
   const btn = document.getElementById('generate-btn');
   if (btn.disabled) return;
 
-  const niche       = document.getElementById('topic-input').value.trim() || null;
-  const demo        = document.getElementById('demo-input').value.trim() || null;
-  const skipVoice   = document.getElementById('skip-voice').checked;
-  const skipThumb   = document.getElementById('skip-thumbnail').checked;
-  const skipVideo   = document.getElementById('skip-video').checked;
-  const isBatch     = document.getElementById('batch-toggle').checked;
-  const batchCnt    = parseInt(document.getElementById('batch-count').value);
-  const webhook     = document.getElementById('webhook-input').value.trim() || null;
-  const styleLocked = document.getElementById('style-locked').checked;
-  const nativeAudio = document.getElementById('native-audio')?.checked || false;
+  const storyPrompt  = document.getElementById('story-prompt')?.value.trim() || '';
+  const seriesTitle  = document.getElementById('series-title')?.value.trim() || '';
+  const episodeNum   = parseInt(document.getElementById('episode-number')?.value || '1') || 1;
+  const narration    = document.getElementById('narration-style')?.value || 'third_person';
+  const previouslyOn = document.getElementById('previously-on')?.value.trim() || '';
+  const worldNotes   = document.getElementById('world-notes')?.value.trim() || '';
+  const skipVoice    = document.getElementById('skip-voice').checked;
+  const skipThumb    = document.getElementById('skip-thumbnail').checked;
+  const skipVideo    = document.getElementById('skip-video').checked;
+  const isBatch      = document.getElementById('batch-toggle').checked;
+  const batchCnt     = parseInt(document.getElementById('batch-count').value);
+  const webhook      = document.getElementById('webhook-input')?.value.trim() || null;
+  const styleLocked  = document.getElementById('style-locked').checked;
+  const nativeAudio  = document.getElementById('native-audio')?.checked || false;
 
-  // Cost guard: warn on expensive runs
+  // Cost guard
   const estimatedCost = parseFloat(
     document.getElementById('cost-val').textContent.replace(/[^0-9.]/g, '') || '0'
   );
   if (estimatedCost > 20) {
     const ok = confirm(
       `⚠️ High Cost Warning\n\nEstimated cost: $${estimatedCost.toFixed(2)}\n\n` +
-      `This run will use ${isBatch ? batchCnt + ' videos × ' : ''}` +
-      `${COST_VIDEO_PER_CLIP[state.videoModel] || 0.14}/clip on ${state.videoModel.split('/').pop()}.\n\n` +
-      `Continue?`
+      `This run will use ${isBatch ? batchCnt + ' episodes × ' : ''}` +
+      `${(COST_VIDEO_PER_CLIP[state.videoModel] || 0.14).toFixed(2)}/clip on ${state.videoModel.split('/').pop()}.\n\nContinue?`
     );
     if (!ok) return;
   }
 
   const basePayload = {
-    niche, tone: state.tone, demographic: demo,
-    skip_voice: skipVoice, skip_thumbnail: skipThumb, skip_video: skipVideo,
-    scene_style: state.sceneStyle || null,
-    thumbnail_model: state.thumbnailModel !== 'fal-ai/flux/dev' ? state.thumbnailModel : null,
-    avatar_id: state.avatarId || null,
-    avatar_model: state.avatarModel !== 'fal-ai/sadtalker' ? state.avatarModel : null,
-    voice_id: state.voiceId || null,
+    genre:            state.genre,
+    tone:             state.tone,
+    series_title:     seriesTitle,
+    episode_number:   episodeNum,
+    story_prompt:     storyPrompt,
+    previously_on:    previouslyOn,
+    world_notes:      worldNotes,
+    narration_style:  narration,
+    skip_voice:       skipVoice,
+    skip_thumbnail:   skipThumb,
+    skip_video:       skipVideo,
+    scene_style:      state.sceneStyle || null,
+    thumbnail_model:  state.thumbnailModel !== 'fal-ai/flux/dev' ? state.thumbnailModel : null,
+    avatar_id:        state.avatarId || null,
+    avatar_model:     state.avatarModel !== 'fal-ai/sadtalker' ? state.avatarModel : null,
+    voice_id:         state.voiceId || null,
     style_locked_broll: styleLocked,
-    video_model: state.videoModel,
+    video_model:      state.videoModel,
     reference_image_id: state.refMediaId || null,
     use_native_audio: nativeAudio,
-    transition: state.transition,
-    card_style: state.cardStyle,
-    cinematic_style: state.cinematicStyle || null,
+    transition:       state.transition,
+    card_style:       state.cardStyle,
+    cinematic_style:  state.cinematicStyle || null,
     reference_all_clips: state.referenceAllClips,
   };
 
   btn.disabled = true;
   btn.classList.add('loading');
-  btn.querySelector('.btn-text').textContent = isBatch ? `Queuing ${batchCnt} videos…` : 'Queuing…';
+  btn.querySelector('.btn-text').textContent = isBatch ? `Queuing ${batchCnt} episodes…` : 'Queuing…';
   btn.querySelector('.btn-icon').style.display = 'none';
 
   try {
     if (isBatch) {
-      const topicsRaw = document.getElementById('batch-topics').value.trim();
-      const topics = topicsRaw ? topicsRaw.split('\n').map(t => t.trim()).filter(Boolean) : [];
+      const promptsRaw = document.getElementById('batch-topics').value.trim();
+      const story_prompts = promptsRaw ? promptsRaw.split('\n').map(t => t.trim()).filter(Boolean) : [];
       const res = await fetch(`${API}/run/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...basePayload, count: batchCnt, topics }),
+        body: JSON.stringify({
+          genre: state.genre, tone: state.tone,
+          series_title: seriesTitle, episode_number: episodeNum,
+          count: batchCnt, story_prompts,
+          skip_voice: skipVoice, skip_thumbnail: skipThumb, skip_video: skipVideo,
+        }),
       });
       const data = await res.json();
-      toast(`Batch queued: ${batchCnt} videos (${data.batch_id})`, 'info');
+      if (!res.ok) throw new Error(data.detail || 'Batch request failed');
+      toast(`Batch queued: ${batchCnt} episodes (${data.batch_id})`, 'info');
       setTimeout(loadAllJobs, 800);
     } else {
       const res = await fetch(`${API}/run`, {
@@ -1792,7 +1854,7 @@ async function generateVideo() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Request failed');
-      toast(`Job started: ${data.job_id}`, 'success');
+      toast(`Episode queued: ${data.job_id}`, 'success');
       injectJobCard(data.job_id, { status: 'queued' });
       startPolling(data.job_id);
     }
@@ -1801,7 +1863,7 @@ async function generateVideo() {
   } finally {
     btn.disabled = false;
     btn.classList.remove('loading');
-    btn.querySelector('.btn-text').textContent = 'Generate Video';
+    btn.querySelector('.btn-text').textContent = 'Generate Episode';
     btn.querySelector('.btn-icon').style.display = '';
   }
 }
@@ -1873,25 +1935,37 @@ function renderJobCard(jobId, data) {
 
 function buildJobCard(jobId, data) {
   const {
-    status = 'queued', title, topic, word_count, duration_min,
+    status = 'queued', title, series_title, episode_number, episode_title,
+    synopsis, cliffhanger, word_count, duration_min,
     tags = [], stage_timings = {}, error,
     audio_path, thumbnail_path, video_path, full_script,
     thumbnail_paths = [], description,
     webhook_callback, webhook_status,
     video_id,
   } = data;
-  const shortId = jobId.replace('job_','').substring(0,8);
 
-  const statusBadge = `<div class="status-badge status-${status}"><div class="sb-dot"></div>${status.charAt(0).toUpperCase()+status.slice(1)}</div>`;
+  const displayStatus = ['queued','running','complete','failed','cancelled'].includes(status) ? status : 'queued';
+  const statusLabel = displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1);
+  const statusBadge = `<div class="status-badge status-${displayStatus}"><div class="sb-dot"></div>${statusLabel}</div>`;
+
+  // Build header text
+  const cardTitle = episode_title || title || (status === 'queued' || status === 'running' ? null : 'Untitled');
+  const cardSub = series_title
+    ? `${series_title}${episode_number ? ` · Ep ${episode_number}` : ''}`
+    : null;
 
   let bodyHtml = '';
 
   if (status === 'running' || status === 'queued') {
     bodyHtml = `<div class="progress-track"><div class="progress-fill"></div></div>
-    <div style="font-size:11px;color:var(--fg-dim);margin-top:8px;">${status === 'queued' ? 'Waiting in queue…' : 'Generating content…'}</div>`;
+    <div style="font-size:11px;color:var(--fg-dim);margin-top:8px;">${status === 'queued' ? 'Waiting in queue…' : 'Generating episode…'}</div>`;
   }
 
-  if (status === 'complete' && (title || topic)) {
+  if (status === 'cancelled') {
+    bodyHtml = `<div style="font-size:12px;color:var(--fg-dim);margin-top:8px;">Job was cancelled.</div>`;
+  }
+
+  if (status === 'complete') {
     const metaItems = [];
     if (word_count)   metaItems.push(`<div class="job-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><strong>${word_count.toLocaleString()}</strong> words</div>`);
     if (duration_min) metaItems.push(`<div class="job-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>${Number(duration_min).toFixed(1)}</strong> min</div>`);
@@ -1957,8 +2031,18 @@ function buildJobCard(jobId, data) {
         <div class="script-body">${escaped}</div>`;
     }
 
+    // Synopsis and cliffhanger
+    const synopsisHtml = synopsis
+      ? `<div style="font-size:12px;color:var(--fg-muted);line-height:1.5;margin-bottom:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);">${esc(synopsis)}</div>`
+      : '';
+    const cliffHtml = cliffhanger
+      ? `<div style="font-size:11px;color:#a78bfa;margin-bottom:10px;padding:6px 10px;border-left:2px solid #8b5cf6;background:rgba(139,92,246,0.06);">⚡ ${esc(cliffhanger)}</div>`
+      : '';
+
     bodyHtml = `
       ${metaItems.length ? `<div class="job-meta">${metaItems.join('')}</div>` : ''}
+      ${synopsisHtml}
+      ${cliffHtml}
       ${tagsHtml}
       ${thumbHtml}
       ${videoHtml}
@@ -1972,12 +2056,14 @@ function buildJobCard(jobId, data) {
     bodyHtml = `<div style="font-size:12px;color:var(--red);margin-top:8px;">${esc(error || 'Unknown error')}</div>`;
   }
 
-  return `<div id="job-${jobId}" class="job-card ${status}" role="article">
+  return `<div id="job-${jobId}" class="job-card ${displayStatus}" role="article">
     <div class="job-top">
       <div>
         <div class="job-id">${esc(jobId)}</div>
-        ${title ? `<div class="job-title">${esc(title)}</div>` : `<div class="job-title" style="color:var(--fg-muted);">Generating…</div>`}
-        ${topic ? `<div class="job-topic">${esc(topic)}</div>` : ''}
+        ${cardTitle
+          ? `<div class="job-title">${esc(cardTitle)}</div>`
+          : `<div class="job-title" style="color:var(--fg-muted);">${status === 'queued' ? 'Queued…' : 'Generating episode…'}</div>`}
+        ${cardSub ? `<div class="job-topic">${esc(cardSub)}</div>` : ''}
       </div>
       ${statusBadge}
     </div>
@@ -2020,7 +2106,7 @@ function buildTimings(timings) {
 function updateStats() {
   const jobs = Object.values(state.allJobs);
   const total   = jobs.filter(j => j.status === 'complete').length;
-  const failed  = jobs.filter(j => j.status === 'failed').length;
+  const failed  = jobs.filter(j => j.status === 'failed' || j.status === 'cancelled').length;
   const running = jobs.filter(j => j.status === 'running' || j.status === 'queued').length;
   const done = total + failed;
   const rate = done > 0 ? Math.round(total / done * 100) : null;
@@ -2135,7 +2221,8 @@ function buildProjectCard(p) {
     <div class="project-body">
       <div class="project-title">${esc(p.title || p.topic || p.video_id)}</div>
       <div class="project-meta">
-        ${p.niche ? `<span>${esc(p.niche)}</span>` : ''}
+        ${p.series_title ? `<span>${esc(p.series_title)}${p.episode_number ? ` Ep ${p.episode_number}` : ''}</span>` : ''}
+        ${p.genre ? `<span>${esc(p.genre)}</span>` : ''}
         ${dur ? `<span>${dur}</span>` : ''}
         ${date ? `<span>${date}</span>` : ''}
       </div>
@@ -2205,7 +2292,7 @@ function renderEpClipList() {
       ${thumbSrc ? `<img class="ep-clip-thumb" src="${thumbSrc}" alt="">` : `<div class="ep-clip-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:18px;">🎬</div>`}
       <div class="ep-clip-info">
         <div class="ep-clip-title">${esc(clip.title || clip.topic || clip.video_id)}</div>
-        <div class="ep-clip-meta">#${i+1} · ${esc(clip.niche||'')} · ${dur}</div>
+        <div class="ep-clip-meta">#${i+1} · ${esc(clip.genre||clip.episode_title||'')} · ${dur}</div>
       </div>
       <div class="ep-clip-order">
         <button class="ep-order-btn" onclick="moveEpClip(${i},-1)" title="Move up" ${i===0?'disabled':''}>▲</button>
@@ -2447,6 +2534,7 @@ async function sendChat() {
     }
 
     chatHistory.push({ role: 'assistant', content: fullText });
+    finalizeMsg(msgId, fullText);
 
   } catch(e) {
     removeTyping(typingId);
@@ -2478,9 +2566,93 @@ function updateChatMsg(id, text) {
   const el = document.getElementById(id);
   if (!el) return;
   const bubble = el.querySelector('.chat-bubble');
-  if (bubble) bubble.innerHTML = esc(text).replace(/\n/g, '<br>');
+  if (bubble) bubble.innerHTML = renderMarkdown(text);
   const messages = document.getElementById('chat-messages');
   if (messages) messages.scrollTop = messages.scrollHeight;
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+function buildSetupCard(config) {
+  const modelLabels = {
+    'fal-ai/kling-video/v2/master/text-to-video':   'Kling v2 Master',
+    'fal-ai/kling-video/v2.1/master/text-to-video': 'Kling v2.1 Master',
+    'fal-ai/kling-video/v3/pro/text-to-video':      'Kling v3 Pro',
+    'fal-ai/veo3':                                   'Veo3',
+    'fal-ai/luma-dream-machine/ray-2-flash':         'Luma Ray 2 Flash',
+    'fal-ai/ltx-video':                              'LTX Video',
+    'fal-ai/minimax/video-01-live':                  'MiniMax',
+    'bytedance/seedance-2.0/text-to-video':          'Seedance 2.0',
+    'alibaba/happy-horse/text-to-video':             'Happy Horse',
+  };
+  const rows = [];
+  if (config.genre)           rows.push(['Genre',      cap(config.genre)]);
+  if (config.tone)            rows.push(['Tone',       cap(config.tone)]);
+  if (config.series_title)    rows.push(['Series',     config.series_title + (config.episode_number ? ` · Ep ${config.episode_number}` : '')]);
+  if (config.story_prompt)    rows.push(['Direction',  config.story_prompt.length > 70 ? config.story_prompt.slice(0, 70) + '…' : config.story_prompt]);
+  if (config.voice_id)        rows.push(['Voice',      cap(config.voice_id)]);
+  if (config.video_model)     rows.push(['Model',      modelLabels[config.video_model] || config.video_model]);
+  if (config.cinematic_style) rows.push(['Style',      config.cinematic_style.length > 55 ? config.cinematic_style.slice(0, 55) + '…' : config.cinematic_style]);
+  if (config.narration_style) rows.push(['Narration',  config.narration_style.replace(/_/g, ' ')]);
+  if (config.transition)      rows.push(['Transition', cap(config.transition)]);
+  return `<div class="setup-card"><div class="setup-card-header"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>&nbsp;Studio settings applied</div><div class="setup-card-rows">${rows.map(([k,v]) => `<div class="setup-card-row"><span class="setup-key">${k}</span><span class="setup-val">${esc(v)}</span></div>`).join('')}</div></div>`;
+}
+
+function applySetup(config) {
+  if (config.genre) {
+    const pill = document.querySelector(`.sel-pill[data-val="${config.genre}"][onclick*="'genre'"]`);
+    if (pill) { pill.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected')); pill.classList.add('selected'); state.genre = config.genre; }
+  }
+  if (config.tone) {
+    const pill = document.querySelector(`.sel-pill[data-val="${config.tone}"][onclick*="'tone'"]`);
+    if (pill) { pill.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected')); pill.classList.add('selected'); state.tone = config.tone; }
+  }
+  if (config.series_title != null) { state.seriesTitle = config.series_title; const el = document.getElementById('series-title'); if (el) el.value = config.series_title; }
+  if (config.episode_number != null) { state.episodeNumber = parseInt(config.episode_number) || 1; const el = document.getElementById('episode-number'); if (el) el.value = state.episodeNumber; }
+  if (config.story_prompt != null) { const el = document.getElementById('story-prompt'); if (el) el.value = config.story_prompt; }
+  if (config.narration_style) { state.narrationStyle = config.narration_style; const el = document.getElementById('narration-style'); if (el) el.value = config.narration_style; }
+  if (config.video_model) { const card = document.querySelector(`.model-card[data-model="${config.video_model}"]`); if (card) selectModel(card, 'video'); }
+  if (config.voice_id != null) { const card = document.querySelector(`.voice-card[data-voice="${config.voice_id}"]`); if (card) selectVoice(card); }
+  if (config.cinematic_style != null) { state.cinematicStyle = config.cinematic_style; const el = document.getElementById('cinematic-style'); if (el) el.value = config.cinematic_style; }
+  if (config.previously_on != null) { state.previouslyOn = config.previously_on; const el = document.getElementById('previously-on'); if (el) el.value = config.previously_on; }
+  if (config.world_notes != null) { state.worldNotes = config.world_notes; const el = document.getElementById('world-notes'); if (el) el.value = config.world_notes; }
+  if (config.transition) {
+    const pill = document.querySelector(`.sel-pill[data-val="${config.transition}"][onclick*="'transition'"]`);
+    if (pill) { pill.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected')); pill.classList.add('selected'); state.transition = config.transition; updateTransitionNote(); }
+  }
+  updateCost();
+  toast('✓ Studio settings applied', 'success');
+}
+
+function finalizeMsg(id, fullText) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const bubble = el.querySelector('.chat-bubble');
+  if (!bubble) return;
+  const setupRe = /\[SETUP:(\{[\s\S]*?\})\]/g;
+  const parts = [];
+  let lastIdx = 0, m, firstSetup = true;
+  while ((m = setupRe.exec(fullText)) !== null) {
+    if (m.index > lastIdx) parts.push({ t: 'text', s: fullText.slice(lastIdx, m.index) });
+    try {
+      const cfg = JSON.parse(m[1]);
+      if (firstSetup) { applySetup(cfg); firstSetup = false; }
+      parts.push({ t: 'setup', cfg });
+    } catch { parts.push({ t: 'text', s: m[0] }); }
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < fullText.length) parts.push({ t: 'text', s: fullText.slice(lastIdx) });
+  if (!parts.length) { bubble.innerHTML = renderMarkdown(fullText); return; }
+  bubble.innerHTML = parts.map(p => p.t === 'setup' ? buildSetupCard(p.cfg) : renderMarkdown(p.s.trim())).filter(Boolean).join('');
 }
 
 function appendTyping() {
