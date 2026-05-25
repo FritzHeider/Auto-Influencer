@@ -641,6 +641,19 @@
   .music-del { width: 20px; height: 20px; border-radius: 4px; border: none; background: transparent; color: var(--fg-dim); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
   .music-del:hover { color: #f87171; }
 
+  /* Live clips panel in Episode Builder */
+  .ep-live-panel { margin-bottom: 20px; padding: 14px; background: rgba(59,130,246,0.06); border: 1.5px solid rgba(59,130,246,0.2); border-radius: var(--radius); }
+  .ep-live-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .ep-live-title { font-size: 12px; font-weight: 700; color: #93c5fd; display: flex; align-items: center; gap: 6px; }
+  .ep-live-pulse { width: 7px; height: 7px; border-radius: 50%; background: #3b82f6; animation: pulse-step 1s ease-in-out infinite; flex-shrink:0; }
+  .ep-live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .ep-live-clip { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; transition: all 0.15s; }
+  .ep-live-clip:hover { border-color: #3b82f6; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.15); }
+  .ep-live-thumb { position: relative; aspect-ratio: 16/9; background: #111; overflow: hidden; }
+  .ep-live-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ep-live-thumb-label { position: absolute; top: 4px; left: 4px; font-size: 9px; font-weight: 700; background: rgba(0,0,0,0.75); color: white; border-radius: 3px; padding: 1px 4px; backdrop-filter: blur(3px); }
+  .ep-live-label { padding: 4px 6px; font-size: 10px; color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
   /* ── Chat tab ──────────────────────────────────────── */
   .chat-panel { display: grid; grid-template-columns: 1fr; max-width: 860px; margin: 0 auto; padding: 24px; height: calc(100vh - 200px); flex-direction: column; }
   .chat-wrap { display: flex; flex-direction: column; height: 100%; }
@@ -1355,6 +1368,7 @@
           </button>
         </div>
       </div>
+      <div id="ep-live-panel" style="display:none;"></div>
       <div class="ep-clip-list" id="ep-clip-list">
         <div class="ep-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
@@ -2027,6 +2041,7 @@ function stopStageAnimation(jobId) {
 function startPolling(jobId) {
   if (state.pollers[jobId]) return;
   startStageAnimation(jobId);
+  startLiveClipsPolling();
   state.pollers[jobId] = setInterval(async () => {
     try {
       const res  = await fetch(`${API}/jobs/${jobId}`, { signal: AbortSignal.timeout(5000) });
@@ -2039,10 +2054,17 @@ function startPolling(jobId) {
         clearInterval(state.pollers[jobId]);
         delete state.pollers[jobId];
         stopStageAnimation(jobId);
+        delete liveClipsState.byJob[jobId];
+        renderLiveClipsPanel();
         if (data.status === 'complete') {
-          toast(`✓ Done: ${data.episode_title || data.series_title || jobId}`, 'success');
           autoIncrementEpisode(data);
           autofillPreviouslyOn(data);
+          const added = addJobToBuilder(jobId, data);
+          if (added) {
+            toastWithAction(`✓ "${(data.episode_title || data.series_title || jobId).substring(0,40)}" ready — added to Episode Builder`, 'View Builder →', () => switchTab('episode'), 'success');
+          } else {
+            toast(`✓ Done: ${data.episode_title || data.series_title || jobId}`, 'success');
+          }
         } else {
           toast(`✗ Job failed: ${jobId}`, 'error');
         }
@@ -2070,8 +2092,10 @@ async function loadAllJobs() {
     for (const [jobId, jobData] of sorted) {
       injectJobCard(jobId, jobData);
       if (jobData.status === 'running' || jobData.status === 'queued') startPolling(jobId);
+      else if (jobData.status === 'complete') addJobToBuilder(jobId, jobData);
     }
     updateStats();
+    updateEpSelectedCount();
   } catch {
     toast('Could not reach API — is the server running?', 'error');
   }
@@ -2222,7 +2246,11 @@ function buildJobCard(jobId, data) {
     const nextEpHtml = series_title
       ? `<button class="job-action-btn primary" onclick="loadNextEpisode(${JSON.stringify(series_title)}, ${nextEpNum})" title="Pre-fill for next episode">▶ Ep ${nextEpNum}</button>`
       : '';
-    const actionRow = `<div class="job-action-row">${nextEpHtml}<button class="job-action-btn" onclick="copyJobId('${jobId}')">⧉ Copy ID</button></div>`;
+    const inBuilder = video_id ? epState.clips.some(c => c.video_id === video_id) : false;
+    const builderBtn = video_id && video_path
+      ? `<button class="job-action-btn${inBuilder?' primary':''}" onclick="addJobToBuilderFromCard('${jobId}',this)" ${inBuilder?'disabled':''}>${inBuilder?'✓ In Builder':'+ Builder'}</button>`
+      : '';
+    const actionRow = `<div class="job-action-row">${nextEpHtml}${builderBtn}<button class="job-action-btn" onclick="copyJobId('${jobId}')">⧉ Copy ID</button></div>`;
     bodyHtml = `
       ${actionRow}
       <button class="card-body-toggle" onclick="toggleCardBody(this)" id="toggle-${jobId}">
@@ -2488,7 +2516,7 @@ function switchTab(name) {
   const panel = document.getElementById(`tab-${name}`);
   if (panel) panel.classList.add('active');
   if (name === 'projects') loadProjects();
-  if (name === 'episode') { renderEpClipList(); loadMusicTracks(); }
+  if (name === 'episode') { renderEpClipList(); loadMusicTracks(); if (Object.keys(state.pollers).length) startLiveClipsPolling(); }
 }
 
 /* ─── Episode state ──────────────────────────────────── */
@@ -2609,6 +2637,134 @@ function updateEpSelectedCount() {
 
 function goToEpisodeBuilder() {
   switchTab('episode');
+}
+
+/* ─── Add job to Episode Builder ─────────────────────── */
+function addJobToBuilder(jobId, data) {
+  if (!data || !data.video_id || !data.video_path) return false;
+  const already = epState.clips.some(c => c.video_id === data.video_id);
+  if (already) return false;
+  epState.clips.push({
+    video_id: data.video_id,
+    title: data.episode_title || data.series_title || jobId,
+    episode_title: data.episode_title,
+    series_title: data.series_title,
+    episode_number: data.episode_number,
+    thumbnail_path: data.thumbnail_path,
+    thumbnail_paths: data.thumbnail_paths || [],
+    video_path: data.video_path,
+    audio_path: data.audio_path,
+    duration_min: data.duration_min,
+    synopsis: data.synopsis,
+    tags: data.tags || [],
+  });
+  const epPanel = document.getElementById('tab-episode');
+  if (epPanel && epPanel.classList.contains('active')) renderEpClipList();
+  updateEpSelectedCount();
+  return true;
+}
+
+function addJobToBuilderFromCard(jobId, btn) {
+  const data = state.allJobs[jobId];
+  if (!data) return;
+  const added = addJobToBuilder(jobId, data);
+  if (added) {
+    btn.textContent = '✓ In Builder';
+    btn.disabled = true;
+    toastWithAction(`"${(data.episode_title || data.series_title || jobId).substring(0,40)}" added`, 'View →', () => switchTab('episode'), 'success');
+  } else {
+    toastWithAction('Already in Episode Builder', 'View →', () => switchTab('episode'), 'info');
+  }
+}
+
+/* ─── Live clips polling for Episode Builder ─────────── */
+const liveClipsState = { byJob: {}, poller: null };
+
+function startLiveClipsPolling() {
+  if (liveClipsState.poller) return;
+  pollAllLiveClips();
+  liveClipsState.poller = setInterval(pollAllLiveClips, 4000);
+}
+
+function stopLiveClipsPolling() {
+  if (liveClipsState.poller) { clearInterval(liveClipsState.poller); liveClipsState.poller = null; }
+}
+
+async function pollAllLiveClips() {
+  const runningIds = Object.keys(state.pollers);
+  if (!runningIds.length) { stopLiveClipsPolling(); renderLiveClipsPanel(); return; }
+  await Promise.all(runningIds.map(async (jobId) => {
+    try {
+      const res = await fetch(`${API}/jobs/${jobId}/clips`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return;
+      const data = await res.json();
+      liveClipsState.byJob[jobId] = data;
+    } catch { /* retry next tick */ }
+  }));
+  for (const jobId of Object.keys(liveClipsState.byJob)) {
+    if (!state.pollers[jobId]) delete liveClipsState.byJob[jobId];
+  }
+  renderLiveClipsPanel();
+}
+
+function renderLiveClipsPanel() {
+  const panel = document.getElementById('ep-live-panel');
+  if (!panel) return;
+  const entries = Object.values(liveClipsState.byJob).filter(e => (e.clips||[]).some(c => c.size > 0));
+  if (!entries.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  panel.innerHTML = entries.map(entry => {
+    const title = entry.episode_title || entry.series_title || entry.job_id;
+    const readyClips = (entry.clips||[]).filter(c => c.size > 0);
+    const cards = readyClips.map((c, i) => {
+      const src = `${API}/files/${c.path}`;
+      return `<div class="ep-live-clip" onclick="openLiveClipPreview('${esc(entry.job_id)}',${i})" title="${esc(c.name)}">
+        <div class="ep-live-thumb">
+          <video src="${src}" muted preload="metadata" onmouseenter="this.play()" onmouseleave="this.pause();this.currentTime=0;"></video>
+          <div class="ep-live-thumb-label">${c.kind==='final'?'FINAL':`B-${i+1}`}</div>
+        </div>
+        <div class="ep-live-label">${esc(c.name)}</div>
+      </div>`;
+    }).join('');
+    return `<div class="ep-live-panel">
+      <div class="ep-live-panel-header">
+        <div class="ep-live-title"><div class="ep-live-pulse"></div>Generating: ${esc(title)}</div>
+        <span style="font-size:10px;color:var(--fg-dim);">${readyClips.length} clip${readyClips.length!==1?'s':''} ready</span>
+      </div>
+      <div class="ep-live-grid">${cards}</div>
+    </div>`;
+  }).join('');
+}
+
+function openLiveClipPreview(jobId, clipIdx) {
+  const entry = liveClipsState.byJob[jobId];
+  if (!entry) return;
+  const readyClips = (entry.clips||[]).filter(c => c.size > 0);
+  const clip = readyClips[clipIdx];
+  if (!clip) return;
+  const src = `${API}/files/${clip.path}`;
+  const existing = document.getElementById('ep-preview-modal');
+  if (existing) { existing.querySelector('video')?.pause(); existing.remove(); }
+  const modal = document.createElement('div');
+  modal.className = 'ep-preview-modal';
+  modal.id = 'ep-preview-modal';
+  modal.innerHTML = `<div class="ep-preview-inner">
+    <div class="ep-preview-header">
+      <div><div style="font-size:14px;font-weight:700;">${esc(clip.name)}</div>
+      <div style="font-size:11px;color:var(--fg-muted);margin-top:2px;">In-progress clip — ${esc(entry.episode_title||entry.series_title||jobId)}</div></div>
+      <button class="ep-preview-close" onclick="closeClipPreview()" title="Close (Esc)">✕</button>
+    </div>
+    <video class="ep-preview-video" controls autoplay src="${src}"></video>
+    <div class="ep-preview-footer">
+      <div style="font-size:11px;color:var(--fg-dim);">Clip ${clipIdx+1} of ${readyClips.length} · ${clip.kind==='final'?'Final assembly':'B-roll'}</div>
+      <div style="flex:1;"></div>
+      <a class="dl-link" href="${src}" download style="font-size:11px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download
+      </a>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeClipPreview(); });
 }
 
 /* ─── Episode Builder ────────────────────────────────── */

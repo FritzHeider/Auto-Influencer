@@ -864,6 +864,48 @@ async def delete_character(char_id: str, x_api_key: Optional[str] = Header(defau
 
 # ── Package / file serving endpoints ─────────────────────────────────────────
 
+@app.get("/jobs/{job_id}/clips")
+async def get_job_clips(job_id: str):
+    """Return available clip files for a job — works during and after generation."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    video_dir = Path(settings.video_dir)
+    clips = []
+
+    # Work directory (in-progress clips): video_dir/{video_id}/c*.mp4
+    video_id = job.get("video_id") or job_id
+    work_dir = video_dir / video_id
+    if work_dir.is_dir():
+        for f in sorted(work_dir.glob("c*.mp4")):
+            rel = f"video/{video_id}/{f.name}"
+            clips.append({"path": rel, "name": f.name, "kind": "broll", "size": f.stat().st_size})
+
+    # Final assembled video
+    final = video_dir / f"{video_id}_final.mp4"
+    if final.exists():
+        clips.append({"path": f"video/{video_id}_final.mp4", "name": "final.mp4", "kind": "final", "size": final.stat().st_size})
+
+    return {
+        "job_id": job_id,
+        "video_id": video_id,
+        "status": job.get("status"),
+        "clips": clips,
+        "episode_title": job.get("episode_title"),
+        "series_title": job.get("series_title"),
+        "episode_number": job.get("episode_number"),
+        "thumbnail_path": job.get("thumbnail_path"),
+        "thumbnail_paths": job.get("thumbnail_paths") or [],
+        "duration_min": job.get("duration_min"),
+        "video_path": job.get("video_path"),
+        "audio_path": job.get("audio_path"),
+        "synopsis": job.get("synopsis"),
+        "cliffhanger": job.get("cliffhanger"),
+        "tags": job.get("tags") or [],
+    }
+
+
 @app.get("/packages/{video_id}")
 async def get_package(video_id: str):
     package_path = Path(settings.output_dir) / f"{video_id}_package.json"
