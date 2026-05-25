@@ -302,7 +302,7 @@ def _plan(
         sec_dur = _section_duration(section)
         sec_start = _ts_to_seconds(section.timestamp_start)
         points = _extract_talking_points(section.content)
-        cues = section.broll_cues or [f"professional footage about {script.topic}"]
+        cues = section.broll_cues or [f"cinematic footage for {script.episode_title or script.series_title or script.genre}"]
 
         # Opening talking-points card
         slots.append(ClipSlot(
@@ -331,7 +331,7 @@ def _plan(
                 slots.append(ClipSlot(
                     kind="broll", sec_idx=sec_idx, cue_idx=cue_idx, variant=v,
                     prompt=_enrich_prompt(
-                        cue, script.topic, section.content, v,
+                        cue, script.episode_title or script.series_title or script.genre, section.content, v,
                         scene_style=scene_style, style_locked=style_locked_broll,
                         cinematic_style=cinematic_style, video_model=video_model,
                     ),
@@ -888,10 +888,10 @@ async def generate_video(
         avatar_bytes = await _load_avatar_from_store(avatar_id)
         if not avatar_bytes:
             logger.warning("Stored avatar not found, generating new one")
-            avatar_bytes = await _generate_avatar_image(" ".join(script.topic.split()[:2]))
+            avatar_bytes = await _generate_avatar_image(script.genre or script.series_title or "cinematic")
     else:
         logger.info("Generating presenter avatar...")
-        avatar_bytes = await _generate_avatar_image(" ".join(script.topic.split()[:2]))
+        avatar_bytes = await _generate_avatar_image(script.genre or script.series_title or "cinematic")
 
     # 2. Resolve reference image (fresh upload — fal URLs have short TTL)
     ref_fal_url: str | None = None
