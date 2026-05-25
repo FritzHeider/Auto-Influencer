@@ -528,7 +528,39 @@
   .ep-sidebar { padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
   .ep-timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .ep-title-text { font-size: 16px; font-weight: 700; }
-  .ep-clip-list { display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+  /* ── Episode Builder storyboard ─────────────────── */
+  .ep-clip-list { min-height: 120px; }
+  .ep-view-toggle { display: flex; gap: 4px; }
+  .ep-view-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; cursor: pointer; color: var(--fg-dim); transition: all 0.15s; }
+  .ep-view-btn.active { border-color: #3b82f6; color: #93c5fd; background: rgba(59,130,246,0.1); }
+  .ep-view-btn svg { width: 14px; height: 14px; display: block; }
+
+  /* Storyboard grid */
+  .ep-storyboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .ep-sb-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; transition: all 0.18s var(--ease); position: relative;
+  }
+  .ep-sb-card:hover { border-color: var(--border-bright); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .ep-sb-card.ep-sb-selected { border-color: #3b82f6; }
+  .ep-sb-thumb-wrap { position: relative; aspect-ratio: 16/9; background: #000; overflow: hidden; cursor: pointer; }
+  .ep-sb-thumb-wrap img, .ep-sb-thumb-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ep-sb-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); opacity: 0; transition: opacity 0.15s; }
+  .ep-sb-thumb-wrap:hover .ep-sb-play { opacity: 1; }
+  .ep-sb-play svg { width: 28px; height: 28px; color: white; drop-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .ep-sb-badge { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.7); color: white; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 5px; backdrop-filter: blur(4px); }
+  .ep-sb-dur-badge { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.7); color: white; font-size: 10px; border-radius: 4px; padding: 2px 5px; backdrop-filter: blur(4px); }
+  .ep-sb-info { padding: 8px 10px; }
+  .ep-sb-title { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ep-sb-meta { font-size: 10px; color: var(--fg-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ep-sb-actions { display: flex; gap: 4px; padding: 0 8px 8px; }
+  .ep-sb-btn { flex: 1; padding: 4px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--fg-dim); font-size: 11px; cursor: pointer; transition: all 0.12s; font-family: var(--font); }
+  .ep-sb-btn:hover:not(:disabled) { border-color: var(--border-bright); color: var(--fg); }
+  .ep-sb-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ep-sb-btn.remove { border-color: rgba(239,68,68,0.25); color: #f87171; }
+  .ep-sb-btn.remove:hover { background: rgba(239,68,68,0.1); }
+
+  /* List view (compact, kept for toggle) */
   .ep-clip {
     display: flex; align-items: center; gap: 10px;
     background: var(--surface); border: 1px solid var(--border);
@@ -536,7 +568,7 @@
     transition: all 0.15s var(--ease);
   }
   .ep-clip:hover { border-color: var(--border-bright); }
-  .ep-clip-thumb { width: 64px; height: 36px; border-radius: 6px; object-fit: cover; background: #000; flex-shrink: 0; }
+  .ep-clip-thumb { width: 80px; height: 45px; border-radius: 6px; object-fit: cover; background: #000; flex-shrink: 0; cursor: pointer; }
   .ep-clip-info { flex: 1; min-width: 0; }
   .ep-clip-title { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ep-clip-meta { font-size: 10px; color: var(--fg-muted); margin-top: 2px; }
@@ -555,6 +587,30 @@
     transition: all 0.12s; flex-shrink: 0;
   }
   .ep-clip-remove:hover { background: rgba(239,68,68,0.12); }
+
+  /* Timeline bar */
+  .ep-timeline-bar { display: flex; gap: 2px; margin-top: 16px; height: 28px; border-radius: var(--radius-sm); overflow: hidden; }
+  .ep-tl-seg { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.7); overflow: hidden; white-space: nowrap; cursor: pointer; transition: filter 0.15s; min-width: 12px; }
+  .ep-tl-seg:hover { filter: brightness(1.3); }
+
+  /* Preview modal */
+  .ep-preview-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.88); backdrop-filter: blur(12px); }
+  .ep-preview-inner { background: var(--bg-elevated); border: 1px solid var(--border-bright); border-radius: var(--radius-lg); overflow: hidden; max-width: min(860px, 92vw); width: 100%; box-shadow: 0 32px 80px rgba(0,0,0,0.7); }
+  .ep-preview-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .ep-preview-nav { display: flex; gap: 6px; }
+  .ep-preview-nav-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--fg-muted); cursor: pointer; font-size: 12px; font-family: var(--font); transition: all 0.15s; }
+  .ep-preview-nav-btn:hover:not(:disabled) { border-color: var(--border-bright); color: var(--fg); }
+  .ep-preview-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ep-preview-close { background: none; border: none; color: var(--fg-dim); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
+  .ep-preview-close:hover { color: var(--fg); }
+  .ep-preview-video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
+  .ep-preview-footer { padding: 12px 18px; display: flex; align-items: center; gap: 10px; }
+  .ep-preview-dots { display: flex; gap: 5px; }
+  .ep-preview-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-bright); cursor: pointer; transition: background 0.15s; }
+  .ep-preview-dot.active { background: #3b82f6; }
+
+  /* Total duration in header */
+  .ep-totals { font-size: 12px; color: var(--fg-muted); display: flex; gap: 12px; align-items: center; }
   .ep-empty {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 48px 24px; color: var(--fg-dim); text-align: center;
@@ -1280,19 +1336,33 @@
   <div class="ep-panel">
     <div class="ep-timeline">
       <div class="ep-timeline-header">
-        <div class="ep-title-text">Episode Timeline</div>
-        <button class="btn-refresh" onclick="switchTab('projects')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
-          Add Clips
-        </button>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div class="ep-title-text">Episode Timeline</div>
+          <div class="ep-totals"><span id="ep-clip-count">0 clips</span><span id="ep-total-dur">0:00 total</span></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="ep-view-toggle">
+            <button class="ep-view-btn active" id="ep-view-storyboard" onclick="setEpView('storyboard')" title="Storyboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button class="ep-view-btn" id="ep-view-list" onclick="setEpView('list')" title="List">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+          </div>
+          <button class="btn-refresh" onclick="switchTab('projects')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+            Add Clips
+          </button>
+        </div>
       </div>
       <div class="ep-clip-list" id="ep-clip-list">
         <div class="ep-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
           <p>No clips selected</p>
-          <small>Go to Projects tab and click checkboxes to add clips</small>
+          <small>Go to Projects tab and select episodes to add</small>
         </div>
       </div>
+      <div id="ep-timeline-bar" class="ep-timeline-bar" style="display:none;"></div>
     </div>
     <div class="ep-sidebar">
       <div>
@@ -2542,33 +2612,178 @@ function goToEpisodeBuilder() {
 }
 
 /* ─── Episode Builder ────────────────────────────────── */
+let epView = 'storyboard'; // 'storyboard' | 'list'
+
+const CLIP_COLORS = ['#3b82f6','#8b5cf6','#06b6d4','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6'];
+
+function setEpView(v) {
+  epView = v;
+  document.getElementById('ep-view-storyboard').classList.toggle('active', v === 'storyboard');
+  document.getElementById('ep-view-list').classList.toggle('active', v === 'list');
+  renderEpClipList();
+}
+
 function renderEpClipList() {
   const list = document.getElementById('ep-clip-list');
   const btn  = document.getElementById('ep-assemble-btn');
+  const bar  = document.getElementById('ep-timeline-bar');
+
+  updateEpTotals();
+
   if (!epState.clips.length) {
-    list.innerHTML = `<div class="ep-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><p>No clips selected</p><small>Go to Projects tab and click + to add clips</small></div>`;
+    list.innerHTML = `<div class="ep-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><p>No clips selected</p><small>Go to Projects tab and select episodes to add</small></div>`;
     if (btn) btn.disabled = true;
+    if (bar) bar.style.display = 'none';
     return;
   }
   if (btn) btn.disabled = false;
-  list.innerHTML = epState.clips.map((clip, i) => {
-    const thumbRel = clip.thumbnail_paths?.[0] ? pathToRelUrl(clip.thumbnail_paths[0]) : (clip.thumbnail_path ? pathToRelUrl(clip.thumbnail_path) : null);
-    const thumbSrc = thumbRel ? `${API}/files/${thumbRel}` : '';
-    const dur = clip.duration_min ? `${Number(clip.duration_min).toFixed(1)} min` : 'unknown dur';
-    return `<div class="ep-clip" id="ep-clip-${i}">
-      ${thumbSrc ? `<img class="ep-clip-thumb" src="${thumbSrc}" alt="">` : `<div class="ep-clip-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:18px;">🎬</div>`}
-      <div class="ep-clip-info">
-        <div class="ep-clip-title">${esc(clip.title || clip.topic || clip.video_id)}</div>
-        <div class="ep-clip-meta">#${i+1} · ${esc(clip.genre||clip.episode_title||'')} · ${dur}</div>
-      </div>
-      <div class="ep-clip-order">
-        <button class="ep-order-btn" onclick="moveEpClip(${i},-1)" title="Move up" ${i===0?'disabled':''}>▲</button>
-        <button class="ep-order-btn" onclick="moveEpClip(${i},1)" title="Move down" ${i===epState.clips.length-1?'disabled':''}>▼</button>
-      </div>
-      <button class="ep-clip-remove" onclick="removeEpClip(${i})" title="Remove">×</button>
-    </div>`;
+  if (bar) { bar.style.display = ''; renderEpTimelineBar(); }
+
+  if (epView === 'storyboard') {
+    list.innerHTML = `<div class="ep-storyboard">${epState.clips.map((clip, i) => buildEpSbCard(clip, i)).join('')}</div>`;
+  } else {
+    list.innerHTML = epState.clips.map((clip, i) => buildEpListRow(clip, i)).join('');
+  }
+}
+
+function buildEpSbCard(clip, i) {
+  const thumbRel = clip.thumbnail_paths?.[0] ? pathToRelUrl(clip.thumbnail_paths[0]) : (clip.thumbnail_path ? pathToRelUrl(clip.thumbnail_path) : null);
+  const thumbSrc = thumbRel ? `${API}/files/${thumbRel}` : '';
+  const videoRel = clip.video_path ? pathToRelUrl(clip.video_path) : null;
+  const dur = clip.duration_min ? `${Number(clip.duration_min).toFixed(1)}m` : '';
+  const title = clip.episode_title || clip.title || clip.video_id;
+  const meta = [clip.series_title, clip.episode_number ? `Ep ${clip.episode_number}` : ''].filter(Boolean).join(' · ');
+  const last = i === epState.clips.length - 1;
+  return `<div class="ep-sb-card" id="ep-clip-${i}">
+    <div class="ep-sb-thumb-wrap" onclick="openClipPreview(${i})">
+      ${thumbSrc
+        ? `<img src="${thumbSrc}" alt="" loading="lazy">`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px;background:#111;">🎬</div>`}
+      <div class="ep-sb-play"><svg viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+      <div class="ep-sb-badge">#${i+1}</div>
+      ${dur ? `<div class="ep-sb-dur-badge">${dur}</div>` : ''}
+    </div>
+    <div class="ep-sb-info">
+      <div class="ep-sb-title" title="${esc(title)}">${esc(title)}</div>
+      ${meta ? `<div class="ep-sb-meta">${esc(meta)}</div>` : ''}
+    </div>
+    <div class="ep-sb-actions">
+      <button class="ep-sb-btn" onclick="moveEpClip(${i},-1)" ${i===0?'disabled':''}>▲</button>
+      <button class="ep-sb-btn" onclick="moveEpClip(${i},1)" ${last?'disabled':''}>▼</button>
+      ${videoRel ? `<button class="ep-sb-btn" onclick="openClipPreview(${i})" title="Preview">▶</button>` : ''}
+      <button class="ep-sb-btn remove" onclick="removeEpClip(${i})">✕</button>
+    </div>
+  </div>`;
+}
+
+function buildEpListRow(clip, i) {
+  const thumbRel = clip.thumbnail_paths?.[0] ? pathToRelUrl(clip.thumbnail_paths[0]) : (clip.thumbnail_path ? pathToRelUrl(clip.thumbnail_path) : null);
+  const thumbSrc = thumbRel ? `${API}/files/${thumbRel}` : '';
+  const dur = clip.duration_min ? `${Number(clip.duration_min).toFixed(1)} min` : '—';
+  const title = clip.episode_title || clip.title || clip.video_id;
+  const meta = [clip.series_title, clip.episode_number ? `Ep ${clip.episode_number}` : '', dur].filter(Boolean).join(' · ');
+  const last = i === epState.clips.length - 1;
+  return `<div class="ep-clip" id="ep-clip-${i}">
+    ${thumbSrc
+      ? `<img class="ep-clip-thumb" src="${thumbSrc}" alt="" onclick="openClipPreview(${i})" style="cursor:pointer">`
+      : `<div class="ep-clip-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:18px;cursor:pointer;" onclick="openClipPreview(${i})">🎬</div>`}
+    <div class="ep-clip-info">
+      <div class="ep-clip-title">#${i+1} · ${esc(title)}</div>
+      <div class="ep-clip-meta">${esc(meta)}</div>
+    </div>
+    <div class="ep-clip-order">
+      <button class="ep-order-btn" onclick="moveEpClip(${i},-1)" ${i===0?'disabled':''}>▲</button>
+      <button class="ep-order-btn" onclick="moveEpClip(${i},1)" ${last?'disabled':''}>▼</button>
+    </div>
+    <button class="ep-clip-remove" onclick="removeEpClip(${i})">×</button>
+  </div>`;
+}
+
+function renderEpTimelineBar() {
+  const bar = document.getElementById('ep-timeline-bar');
+  if (!bar) return;
+  const clips = epState.clips;
+  const totalSecs = clips.reduce((s, c) => s + (Number(c.duration_min) || 0) * 60, 0) || clips.length;
+  bar.innerHTML = clips.map((clip, i) => {
+    const secs = (Number(clip.duration_min) || 0) * 60 || 1;
+    const pct = (secs / totalSecs * 100).toFixed(1);
+    const col = CLIP_COLORS[i % CLIP_COLORS.length];
+    const label = clip.series_title ? `${clip.series_title} E${clip.episode_number || i+1}` : `#${i+1}`;
+    return `<div class="ep-tl-seg" style="width:${pct}%;background:${col};opacity:0.75;" onclick="openClipPreview(${i})" title="${esc(label)}">${pct > 8 ? esc(label) : ''}</div>`;
   }).join('');
 }
+
+function updateEpTotals() {
+  const clips = epState.clips;
+  const totalMins = clips.reduce((s, c) => s + (Number(c.duration_min) || 0), 0);
+  const mins = Math.floor(totalMins);
+  const secs = Math.round((totalMins - mins) * 60);
+  document.getElementById('ep-clip-count').textContent = `${clips.length} clip${clips.length !== 1 ? 's' : ''}`;
+  document.getElementById('ep-total-dur').textContent = clips.length ? `${mins}:${String(secs).padStart(2,'0')} total` : '0:00 total';
+}
+
+/* ─── Clip preview modal ─────────────────────────────── */
+let previewIdx = 0;
+
+function openClipPreview(i) {
+  const clips = epState.clips;
+  if (!clips.length) return;
+  const clip = clips[i];
+  const videoRel = clip.video_path ? pathToRelUrl(clip.video_path) : null;
+  if (!videoRel) { toast('No video file for this clip yet', 'info'); return; }
+  previewIdx = i;
+
+  const title = clip.episode_title || clip.title || clip.video_id;
+  const meta = [clip.series_title, clip.episode_number ? `Ep ${clip.episode_number}` : '', clip.duration_min ? `${Number(clip.duration_min).toFixed(1)} min` : ''].filter(Boolean).join(' · ');
+
+  const dots = clips.map((_, j) =>
+    `<div class="ep-preview-dot${j===i?' active':''}" onclick="openClipPreview(${j})"></div>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'ep-preview-modal';
+  modal.id = 'ep-preview-modal';
+  modal.innerHTML = `
+    <div class="ep-preview-inner">
+      <div class="ep-preview-header">
+        <div>
+          <div style="font-size:14px;font-weight:700;">${esc(title)}</div>
+          <div style="font-size:11px;color:var(--fg-muted);margin-top:2px;">${esc(meta)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="ep-preview-nav">
+            <button class="ep-preview-nav-btn" onclick="openClipPreview(${i-1})" ${i===0?'disabled':''}>◀ Prev</button>
+            <span style="font-size:11px;color:var(--fg-muted);padding:0 4px;">${i+1} / ${clips.length}</span>
+            <button class="ep-preview-nav-btn" onclick="openClipPreview(${i+1})" ${i===clips.length-1?'disabled':''}>Next ▶</button>
+          </div>
+          <button class="ep-preview-close" onclick="closeClipPreview()" title="Close (Esc)">✕</button>
+        </div>
+      </div>
+      <video class="ep-preview-video" controls autoplay src="${API}/files/${videoRel}"></video>
+      <div class="ep-preview-footer">
+        <div class="ep-preview-dots">${dots}</div>
+        <div style="flex:1;"></div>
+        <a class="dl-link" href="${API}/files/${videoRel}" download style="font-size:11px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download
+        </a>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeClipPreview(); });
+}
+
+function closeClipPreview() {
+  const m = document.getElementById('ep-preview-modal');
+  if (m) { m.querySelector('video')?.pause(); m.remove(); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeClipPreview();
+  if (document.getElementById('ep-preview-modal')) {
+    if (e.key === 'ArrowRight') openClipPreview(Math.min(previewIdx+1, epState.clips.length-1));
+    if (e.key === 'ArrowLeft')  openClipPreview(Math.max(previewIdx-1, 0));
+  }
+});
 
 function moveEpClip(i, dir) {
   const j = i + dir;
