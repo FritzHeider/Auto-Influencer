@@ -637,6 +637,53 @@
   .setup-key { font-size: 11px; color: var(--fg-dim); min-width: 72px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
   .setup-val { font-size: 12px; color: var(--fg); }
   .inline-code { font-family: monospace; font-size: 12px; background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; }
+
+  /* ── Generate-from-chat button ──────────────────── */
+  .setup-generate-btn { margin-top: 10px; width: 100%; padding: 9px 14px; background: var(--gradient); border: none; border-radius: var(--radius-sm); color: white; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .setup-generate-btn:hover { opacity: 0.88; }
+
+  /* ── Job action buttons ─────────────────────────── */
+  .job-action-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .job-action-btn { padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-bright); background: var(--surface); color: var(--fg-muted); font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all 0.15s var(--ease); }
+  .job-action-btn:hover { color: var(--fg); border-color: rgba(255,255,255,0.22); background: var(--surface-hover); }
+  .job-action-btn.primary { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.3); color: #93c5fd; }
+  .job-copy-id { background: none; border: none; color: var(--fg-dim); cursor: pointer; padding: 2px 5px; border-radius: 4px; font-size: 13px; line-height: 1; transition: color 0.15s; vertical-align: middle; }
+  .job-copy-id:hover { color: var(--fg-muted); }
+
+  /* ── Tab badge ──────────────────────────────────── */
+  .tab-badge { display: inline-flex; align-items: center; justify-content: center; background: #ef4444; color: white; font-size: 10px; font-weight: 700; border-radius: 100px; min-width: 16px; padding: 0 4px; height: 16px; margin-left: 4px; line-height: 1; }
+
+  /* ── Stage progress in running cards ───────────── */
+  .stage-steps { display: flex; gap: 3px; align-items: center; margin-top: 10px; }
+  .stage-step { flex: 1; height: 3px; border-radius: 2px; background: var(--border); transition: background 0.5s; }
+  .stage-step.done { background: #22c55e; }
+  .stage-step.active { background: #3b82f6; animation: pulse-step 1.4s ease-in-out infinite; }
+  @keyframes pulse-step { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  .stage-label { font-size: 11px; color: var(--fg-dim); margin-top: 5px; min-height: 16px; }
+
+  /* ── Collapsible completed card body ────────────── */
+  .card-body-toggle { display: flex; align-items: center; gap: 4px; background: none; border: none; color: var(--fg-dim); font-size: 11px; font-weight: 600; cursor: pointer; padding: 6px 0 2px; font-family: var(--font); transition: color 0.15s; }
+  .card-body-toggle svg { width: 12px; height: 12px; transition: transform 0.2s; flex-shrink: 0; }
+  .card-body-toggle.open svg { transform: rotate(180deg); }
+  .card-body-toggle:hover { color: var(--fg-muted); }
+  .card-body-wrap { overflow: hidden; transition: max-height 0.3s var(--ease); }
+  .card-body-wrap.collapsed { display: none; }
+
+  /* ── Char counter ───────────────────────────────── */
+  .char-counter { font-size: 11px; color: var(--fg-dim); text-align: right; margin-top: 3px; transition: color 0.2s; }
+  .char-counter.warn { color: var(--amber); }
+
+  /* ── Duration estimate ──────────────────────────── */
+  .duration-est { font-size: 11px; color: var(--fg-dim); margin-top: 5px; }
+
+  /* ── Chat clear + suggestions row ──────────────── */
+  .chat-meta-row { display: flex; justify-content: flex-end; padding: 0 0 6px; }
+  .chat-meta-btn { background: none; border: none; color: var(--fg-dim); font-size: 11px; cursor: pointer; padding: 2px 6px; border-radius: 4px; font-family: var(--font); transition: color 0.15s; }
+  .chat-meta-btn:hover { color: var(--fg-muted); }
+
+  /* ── Clear completed button ─────────────────────── */
+  .clear-done-btn { font-size: 11px; color: var(--fg-dim); background: none; border: none; cursor: pointer; font-family: var(--font); padding: 4px 8px; border-radius: 4px; transition: color 0.15s; }
+  .clear-done-btn:hover { color: var(--red); }
   @keyframes typing-dot { 0%,80%,100% { transform: scale(0.7); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
   .chat-suggestion { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .chat-sugg-btn {
@@ -715,9 +762,9 @@
 
 <!-- ── Tab navigation ── -->
 <nav class="tab-nav" role="tablist" aria-label="Studio sections">
-  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-generate" onclick="switchTab('generate')">
+  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-generate" onclick="switchTab('generate')" id="generate-tab-btn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-    <span>Generate</span>
+    <span>Generate</span><span class="tab-badge" id="jobs-badge" style="display:none">0</span>
   </button>
   <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-projects" onclick="switchTab('projects')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z"/></svg>
@@ -849,13 +896,15 @@
         <div class="sel-pill selected" data-val="medium" onclick="selectPill(this,'length')" tabindex="0">Medium · 5–7 min</div>
         <div class="sel-pill" data-val="long" onclick="selectPill(this,'length')" tabindex="0">Long · 10–12 min</div>
       </div>
+      <div class="duration-est" id="duration-est">~5–7 min · ~900–1,100 words · 3–5 B-roll clips</div>
     </div>
 
     <!-- Story Prompt -->
     <div>
       <div class="field-wrap">
         <label class="field-label" for="story-prompt">Story Direction</label>
-        <textarea id="story-prompt" class="text-input" rows="3" placeholder="Describe the episode concept, key conflict, or creative direction… (leave blank for AI to decide)" oninput="updateCost()"></textarea>
+        <textarea id="story-prompt" class="text-input" rows="3" placeholder="Describe the episode concept, key conflict, or creative direction… (leave blank for AI to decide)" oninput="updateCost();updateCharCounter(this)"></textarea>
+        <div class="char-counter" id="story-char-counter" style="display:none"></div>
       </div>
     </div>
 
@@ -1177,12 +1226,15 @@
 
   <!-- ── Jobs Panel ── -->
   <main class="jobs-panel" role="main" aria-label="Jobs feed" id="jobs-panel">
-    <div class="jobs-header">
+    <div class="jobs-header" id="jobs-feed-anchor">
       <div class="jobs-title">Live Jobs Feed</div>
-      <button class="btn-refresh" onclick="loadAllJobs()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
-        Refresh
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="clear-done-btn" onclick="clearCompletedJobs()" title="Remove completed/failed/cancelled jobs">Clear done</button>
+        <button class="btn-refresh" onclick="loadAllJobs()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+          Refresh
+        </button>
+      </div>
     </div>
     <div id="jobs-list">
       <div class="empty-state">
@@ -1305,6 +1357,9 @@
             Ralph here. What are we building — new series, next episode, or a story problem to solve?<br><br>Say <strong>Setup Wizard</strong> and I'll ask a few questions then apply the settings to your studio automatically.
           </div>
         </div>
+      </div>
+      <div class="chat-meta-row">
+        <button class="chat-meta-btn" onclick="clearChat()" title="Clear conversation">Clear chat</button>
       </div>
       <div class="chat-suggestion" id="chat-suggestions">
         <button class="chat-sugg-btn" onclick="sendSuggestion(this)">🎬 Setup Wizard — plan my next episode</button>
@@ -1430,7 +1485,7 @@ function selectThumbModel(el) {
 function selectPill(el, group) {
   el.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected'));
   el.classList.add('selected');
-  if (group === 'length')     state.length     = el.dataset.val;
+  if (group === 'length')     { state.length = el.dataset.val; updateDurationEst(); }
   if (group === 'genre')      state.genre      = el.dataset.val;
   if (group === 'tone')       state.tone       = el.dataset.val;
   if (group === 'scene')      state.sceneStyle = el.dataset.val;
@@ -1855,8 +1910,9 @@ async function generateVideo() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Request failed');
       toast(`Episode queued: ${data.job_id}`, 'success');
-      injectJobCard(data.job_id, { status: 'queued' });
+      injectJobCard(data.job_id, { status: 'queued', series_title: seriesTitle, episode_number: episodeNum });
       startPolling(data.job_id);
+      switchTab('generate');
     }
   } catch (err) {
     toast(`Error: ${err.message}`, 'error');
@@ -1868,9 +1924,39 @@ async function generateVideo() {
   }
 }
 
+/* ─── Stage animation ───────────────────────────────── */
+const STAGE_NAMES  = ['Writing story brief…','Scripting episode…','Recording voiceover…','Generating cover art…','Assembling video…'];
+const STAGE_TIMES  = [0, 6, 28, 75, 95]; // cumulative % of typical runtime
+const stageTimers  = {};
+
+function startStageAnimation(jobId) {
+  if (stageTimers[jobId]) return;
+  const start = Date.now();
+  const typicalMs = 240000; // ~4 min typical
+  stageTimers[jobId] = setInterval(() => {
+    const pct = Math.min((Date.now() - start) / typicalMs * 100, 98);
+    let active = 0;
+    for (let i = STAGE_TIMES.length - 1; i >= 0; i--) {
+      if (pct >= STAGE_TIMES[i]) { active = i; break; }
+    }
+    for (let i = 0; i < 5; i++) {
+      const el = document.getElementById(`ss${i}-${jobId}`);
+      if (!el) continue;
+      el.className = 'stage-step' + (i < active ? ' done' : i === active ? ' active' : '');
+    }
+    const lbl = document.getElementById(`stage-label-${jobId}`);
+    if (lbl) lbl.textContent = STAGE_NAMES[active] || STAGE_NAMES[4];
+  }, 2000);
+}
+
+function stopStageAnimation(jobId) {
+  if (stageTimers[jobId]) { clearInterval(stageTimers[jobId]); delete stageTimers[jobId]; }
+}
+
 /* ─── Job polling ───────────────────────────────────── */
 function startPolling(jobId) {
   if (state.pollers[jobId]) return;
+  startStageAnimation(jobId);
   state.pollers[jobId] = setInterval(async () => {
     try {
       const res  = await fetch(`${API}/jobs/${jobId}`, { signal: AbortSignal.timeout(5000) });
@@ -1878,11 +1964,18 @@ function startPolling(jobId) {
       state.allJobs[jobId] = data;
       renderJobCard(jobId, data);
       updateStats();
+      updateJobBadge();
       if (data.status === 'complete' || data.status === 'failed') {
         clearInterval(state.pollers[jobId]);
         delete state.pollers[jobId];
-        if (data.status === 'complete') toast(`Done: ${data.title || jobId}`, 'success');
-        else toast(`Job failed: ${jobId}`, 'error');
+        stopStageAnimation(jobId);
+        if (data.status === 'complete') {
+          toast(`✓ Done: ${data.episode_title || data.series_title || jobId}`, 'success');
+          autoIncrementEpisode(data);
+          autofillPreviouslyOn(data);
+        } else {
+          toast(`✗ Job failed: ${jobId}`, 'error');
+        }
       }
     } catch { /* retry next tick */ }
   }, 3000);
@@ -1921,8 +2014,13 @@ function injectJobCard(jobId, data) {
   const empty = list.querySelector('.empty-state');
   if (empty) empty.remove();
   let card = document.getElementById(`job-${jobId}`);
+  const isNew = !card;
   if (!card) { card = document.createElement('div'); card.id = `job-${jobId}`; list.prepend(card); }
   card.outerHTML = buildJobCard(jobId, data);
+  if (isNew) {
+    const anchor = document.getElementById('jobs-feed-anchor');
+    if (anchor) setTimeout(() => anchor.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
 }
 
 function renderJobCard(jobId, data) {
@@ -1957,8 +2055,19 @@ function buildJobCard(jobId, data) {
   let bodyHtml = '';
 
   if (status === 'running' || status === 'queued') {
+    const stageSteps = status === 'running'
+      ? `<div class="stage-steps" id="stage-steps-${jobId}">
+          <div class="stage-step" id="ss0-${jobId}"></div>
+          <div class="stage-step" id="ss1-${jobId}"></div>
+          <div class="stage-step" id="ss2-${jobId}"></div>
+          <div class="stage-step" id="ss3-${jobId}"></div>
+          <div class="stage-step" id="ss4-${jobId}"></div>
+        </div>
+        <div class="stage-label" id="stage-label-${jobId}">Writing story brief…</div>`
+      : '';
     bodyHtml = `<div class="progress-track"><div class="progress-fill"></div></div>
-    <div style="font-size:11px;color:var(--fg-dim);margin-top:8px;">${status === 'queued' ? 'Waiting in queue…' : 'Generating episode…'}</div>`;
+    ${stageSteps}
+    <div style="font-size:11px;color:var(--fg-dim);margin-top:${status==='running'?'0':'8px'};">${status === 'queued' ? 'Waiting in queue…' : ''}</div>`;
   }
 
   if (status === 'cancelled') {
@@ -2039,27 +2148,40 @@ function buildJobCard(jobId, data) {
       ? `<div style="font-size:11px;color:#a78bfa;margin-bottom:10px;padding:6px 10px;border-left:2px solid #8b5cf6;background:rgba(139,92,246,0.06);">⚡ ${esc(cliffhanger)}</div>`
       : '';
 
+    const nextEpNum = (episode_number || 1) + 1;
+    const nextEpHtml = series_title
+      ? `<button class="job-action-btn primary" onclick="loadNextEpisode(${JSON.stringify(series_title)}, ${nextEpNum})" title="Pre-fill for next episode">▶ Ep ${nextEpNum}</button>`
+      : '';
+    const actionRow = `<div class="job-action-row">${nextEpHtml}<button class="job-action-btn" onclick="copyJobId('${jobId}')">⧉ Copy ID</button></div>`;
     bodyHtml = `
-      ${metaItems.length ? `<div class="job-meta">${metaItems.join('')}</div>` : ''}
-      ${synopsisHtml}
-      ${cliffHtml}
-      ${tagsHtml}
-      ${thumbHtml}
-      ${videoHtml}
-      ${downloadsHtml}
-      ${webhookHtml}
-      ${buildTimings(stage_timings)}
-      ${scriptHtml}`;
+      ${actionRow}
+      <button class="card-body-toggle" onclick="toggleCardBody(this)" id="toggle-${jobId}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        Show details
+      </button>
+      <div class="card-body-wrap collapsed" id="body-${jobId}">
+        ${metaItems.length ? `<div class="job-meta">${metaItems.join('')}</div>` : ''}
+        ${synopsisHtml}
+        ${cliffHtml}
+        ${tagsHtml}
+        ${thumbHtml}
+        ${videoHtml}
+        ${downloadsHtml}
+        ${webhookHtml}
+        ${buildTimings(stage_timings)}
+        ${scriptHtml}
+      </div>`;
   }
 
   if (status === 'failed') {
-    bodyHtml = `<div style="font-size:12px;color:var(--red);margin-top:8px;">${esc(error || 'Unknown error')}</div>`;
+    bodyHtml = `<div style="font-size:12px;color:var(--red);margin-top:8px;">${esc(error || 'Unknown error')}</div>
+    <div class="job-action-row"><button class="job-action-btn" onclick="retryJob('${jobId}')">↺ Retry</button><button class="job-action-btn" onclick="copyJobId('${jobId}')">⧉ Copy ID</button></div>`;
   }
 
   return `<div id="job-${jobId}" class="job-card ${displayStatus}" role="article">
     <div class="job-top">
       <div>
-        <div class="job-id">${esc(jobId)}</div>
+        <div class="job-id">${esc(jobId)}<button class="job-copy-id" onclick="copyJobId('${jobId}')" title="Copy job ID">⧉</button></div>
         ${cardTitle
           ? `<div class="job-title">${esc(cardTitle)}</div>`
           : `<div class="job-title" style="color:var(--fg-muted);">${status === 'queued' ? 'Queued…' : 'Generating episode…'}</div>`}
@@ -2117,6 +2239,7 @@ function updateStats() {
   document.getElementById('stat-success').textContent = rate !== null ? `${rate}%` : '—';
   document.getElementById('stat-avg').textContent     = avg !== null ? `${avg}s` : '—';
   document.getElementById('stat-running').textContent = running;
+  updateJobBadge();
 }
 
 function toast(msg, type = 'info') {
@@ -2125,7 +2248,151 @@ function toast(msg, type = 'info') {
   el.setAttribute('role', 'status');
   el.textContent = msg;
   document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => { el.classList.add('toast-out'); setTimeout(() => el.remove(), 220); }, 4000);
+  setTimeout(() => { el.classList.add('toast-out'); setTimeout(() => el.remove(), 220); }, 4500);
+}
+
+function toastWithAction(msg, actionLabel, actionFn, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.setAttribute('role', 'status');
+  el.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
+  el.innerHTML = `<span>${esc(msg)}</span><button style="background:none;border:none;color:inherit;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px;padding:0;white-space:nowrap;" onclick="this.closest('.toast').remove();(${actionFn.toString()})()">${esc(actionLabel)}</button>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.classList.add('toast-out'); setTimeout(() => el.remove(), 220); }, 6000);
+}
+
+/* ─── New utility functions ─────────────────────────── */
+
+function updateJobBadge() {
+  const badge = document.getElementById('jobs-badge');
+  if (!badge) return;
+  const n = Object.values(state.allJobs).filter(j => j.status === 'running' || j.status === 'queued').length;
+  if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+function updateCharCounter(el) {
+  const counter = document.getElementById('story-char-counter');
+  if (!counter) return;
+  const len = el.value.length;
+  if (len === 0) { counter.style.display = 'none'; return; }
+  counter.style.display = '';
+  counter.textContent = `${len}/500`;
+  counter.className = 'char-counter' + (len > 500 ? ' warn' : '');
+}
+
+function updateDurationEst() {
+  const el = document.getElementById('duration-est');
+  if (!el) return;
+  const map = {
+    short:  '~2–3 min · ~400–550 words · 2–3 B-roll clips',
+    medium: '~5–7 min · ~900–1,100 words · 3–5 B-roll clips',
+    long:   '~10–12 min · ~1,800–2,200 words · 6–9 B-roll clips',
+  };
+  el.textContent = map[state.length] || map.medium;
+}
+
+function clearCompletedJobs() {
+  const terminal = ['complete', 'failed', 'cancelled'];
+  const list = document.getElementById('jobs-list');
+  terminal.forEach(s => {
+    Object.entries(state.allJobs).forEach(([id, d]) => {
+      if (d.status === s) {
+        delete state.allJobs[id];
+        const el = document.getElementById(`job-${id}`);
+        if (el) el.remove();
+      }
+    });
+  });
+  if (!list.querySelector('.job-card')) list.innerHTML = emptyState();
+  updateStats();
+  toast('Completed jobs cleared', 'info');
+}
+
+function copyJobId(jobId) {
+  navigator.clipboard.writeText(jobId).then(() => toast('Job ID copied', 'info'));
+}
+
+function toggleCardBody(btn) {
+  btn.classList.toggle('open');
+  const wrap = btn.nextElementSibling;
+  if (!wrap) return;
+  const collapsed = wrap.classList.toggle('collapsed');
+  btn.childNodes[btn.childNodes.length - 1].textContent = ' ' + (collapsed ? 'Show details' : 'Hide details');
+}
+
+async function retryJob(jobId) {
+  const d = state.allJobs[jobId] || {};
+  try {
+    const res = await fetch(`${API}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        genre: d.genre || state.genre,
+        tone: d.tone || state.tone,
+        series_title: d.series_title || state.seriesTitle,
+        episode_number: d.episode_number || state.episodeNumber,
+        story_prompt: d.story_prompt || '',
+        voice_id: state.voiceId || null,
+        video_model: state.videoModel,
+        cinematic_style: state.cinematicStyle || null,
+        narration_style: state.narrationStyle,
+        transition: state.transition,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    toast(`Retried: ${data.job_id}`, 'success');
+    injectJobCard(data.job_id, { status: 'queued', series_title: d.series_title, episode_number: d.episode_number });
+    startPolling(data.job_id);
+    switchTab('generate');
+  } catch(e) { toast(`Retry failed: ${e.message}`, 'error'); }
+}
+
+function loadNextEpisode(seriesTitle, epNum) {
+  document.getElementById('series-title').value = seriesTitle;
+  state.seriesTitle = seriesTitle;
+  document.getElementById('episode-number').value = epNum;
+  state.episodeNumber = epNum;
+  document.getElementById('story-prompt').value = '';
+  switchTab('generate');
+  toast(`Loaded: ${seriesTitle} Ep ${epNum}`, 'info');
+}
+
+function autoIncrementEpisode(data) {
+  if (data.series_title && data.series_title === state.seriesTitle && data.episode_number === state.episodeNumber) {
+    state.episodeNumber += 1;
+    const el = document.getElementById('episode-number');
+    if (el) el.value = state.episodeNumber;
+  }
+}
+
+function autofillPreviouslyOn(data) {
+  if (data.series_title && data.series_title === state.seriesTitle && data.cliffhanger) {
+    const el = document.getElementById('previously-on');
+    if (el && !el.value.trim()) {
+      el.value = data.cliffhanger;
+      state.previouslyOn = data.cliffhanger;
+      toast('Previously On auto-filled from cliffhanger', 'info');
+    }
+  }
+}
+
+function generateFromChat() {
+  switchTab('generate');
+  setTimeout(() => {
+    generateVideo();
+    document.getElementById('jobs-feed-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 150);
+}
+
+function clearChat() {
+  chatHistory.length = 0;
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = `<div class="chat-msg ai"><div class="chat-avatar ai"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div class="chat-bubble">Ralph here. What are we building — new series, next episode, or a story problem to solve?<br><br>Say <strong>Setup Wizard</strong> and I'll ask a few questions then apply the settings to your studio automatically.</div></div>`;
+  const sugg = document.getElementById('chat-suggestions');
+  if (sugg) sugg.style.display = '';
+  toast('Chat cleared', 'info');
 }
 
 function esc(s) {
@@ -2543,6 +2810,9 @@ async function sendChat() {
 
   chatStreaming = false;
   document.getElementById('chat-send-btn').disabled = false;
+  // re-show suggestions after every response
+  const sugg = document.getElementById('chat-suggestions');
+  if (sugg) sugg.style.display = '';
 }
 
 function appendChatMsg(role, text) {
@@ -2604,7 +2874,7 @@ function buildSetupCard(config) {
   if (config.cinematic_style) rows.push(['Style',      config.cinematic_style.length > 55 ? config.cinematic_style.slice(0, 55) + '…' : config.cinematic_style]);
   if (config.narration_style) rows.push(['Narration',  config.narration_style.replace(/_/g, ' ')]);
   if (config.transition)      rows.push(['Transition', cap(config.transition)]);
-  return `<div class="setup-card"><div class="setup-card-header"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>&nbsp;Studio settings applied</div><div class="setup-card-rows">${rows.map(([k,v]) => `<div class="setup-card-row"><span class="setup-key">${k}</span><span class="setup-val">${esc(v)}</span></div>`).join('')}</div></div>`;
+  return `<div class="setup-card"><div class="setup-card-header"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>&nbsp;Studio settings applied</div><div class="setup-card-rows">${rows.map(([k,v]) => `<div class="setup-card-row"><span class="setup-key">${k}</span><span class="setup-val">${esc(v)}</span></div>`).join('')}</div><div style="padding:8px 12px 10px;"><button class="setup-generate-btn" onclick="generateFromChat()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>Generate Episode Now</button></div></div>`;
 }
 
 function applySetup(config) {
@@ -2630,7 +2900,7 @@ function applySetup(config) {
     if (pill) { pill.parentElement.querySelectorAll('.sel-pill').forEach(p => p.classList.remove('selected')); pill.classList.add('selected'); state.transition = config.transition; updateTransitionNote(); }
   }
   updateCost();
-  toast('✓ Studio settings applied', 'success');
+  toastWithAction('✓ Studio settings applied', 'Generate →', generateFromChat, 'success');
 }
 
 function finalizeMsg(id, fullText) {
@@ -2652,7 +2922,10 @@ function finalizeMsg(id, fullText) {
   }
   if (lastIdx < fullText.length) parts.push({ t: 'text', s: fullText.slice(lastIdx) });
   if (!parts.length) { bubble.innerHTML = renderMarkdown(fullText); return; }
-  bubble.innerHTML = parts.map(p => p.t === 'setup' ? buildSetupCard(p.cfg) : renderMarkdown(p.s.trim())).filter(Boolean).join('');
+  // Strip [GENERATE] command (auto-trigger handled separately)
+  const hasGenerate = fullText.includes('[GENERATE]');
+  bubble.innerHTML = parts.map(p => p.t === 'setup' ? buildSetupCard(p.cfg) : renderMarkdown(p.s.replace('[GENERATE]','').trim())).filter(Boolean).join('');
+  if (hasGenerate) setTimeout(generateFromChat, 800);
 }
 
 function appendTyping() {

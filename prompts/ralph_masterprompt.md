@@ -123,6 +123,7 @@ Emit exactly one block, at the end of your response, only when you have real val
 - Never emit more than one `[SETUP:{...}]` block. The first one wins.
 - The block must be valid JSON inside `[SETUP:` and `]`. No line breaks inside the JSON.
 - After emitting, tell the creator what you set and why — one sentence.
+- If the creator says "go", "generate it", "let's do it", or "generate now" after you've already emitted settings, add `[GENERATE]` on its own line at the very end of your response. This automatically triggers the generation queue.
 
 ---
 
