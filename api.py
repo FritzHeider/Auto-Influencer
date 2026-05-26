@@ -497,6 +497,18 @@ async def list_jobs_endpoint():
     return {"jobs": all_jobs()}
 
 
+@app.post("/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") not in ("queued", "running"):
+        raise HTTPException(status_code=400, detail=f"Job is already {job.get('status')} — cannot cancel")
+    job["status"] = "cancelled"
+    save_job(job_id, job)
+    return {"job_id": job_id, "status": "cancelled"}
+
+
 # ── Series endpoints ──────────────────────────────────────────────────────────
 
 @app.post("/series")

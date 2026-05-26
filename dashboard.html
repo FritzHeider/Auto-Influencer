@@ -2161,7 +2161,10 @@ function buildJobCard(jobId, data) {
       : '';
     bodyHtml = `<div class="progress-track"><div class="progress-fill"></div></div>
     ${stageSteps}
-    <div style="font-size:11px;color:var(--fg-dim);margin-top:${status==='running'?'0':'8px'};">${status === 'queued' ? 'Waiting in queue…' : ''}</div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:${status==='running'?'4px':'8px'};">
+      <div style="font-size:11px;color:var(--fg-dim);">${status === 'queued' ? 'Waiting in queue…' : ''}</div>
+      <button class="job-action-btn" style="color:#f87171;border-color:rgba(239,68,68,0.25);" onclick="cancelJob('${jobId}')">✕ Cancel</button>
+    </div>`;
   }
 
   if (status === 'cancelled') {
@@ -2405,6 +2408,22 @@ function clearCompletedJobs() {
   if (!list.querySelector('.job-card')) list.innerHTML = emptyState();
   updateStats();
   toast('Completed jobs cleared', 'info');
+}
+
+async function cancelJob(jobId) {
+  try {
+    const res = await fetch(`${API}/jobs/${jobId}/cancel`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+    if (!res.ok) { const e = await res.json(); toast(e.detail || 'Cancel failed', 'error'); return; }
+    const data = await res.json();
+    state.allJobs[jobId] = { ...state.allJobs[jobId], status: 'cancelled' };
+    if (state.pollers[jobId]) { clearInterval(state.pollers[jobId]); delete state.pollers[jobId]; }
+    stopStageAnimation(jobId);
+    delete liveClipsState.byJob[jobId];
+    renderLiveClipsPanel();
+    renderJobCard(jobId, state.allJobs[jobId]);
+    updateStats(); updateJobBadge();
+    toast(`Job ${jobId} cancelled`, 'info');
+  } catch { toast('Could not reach API', 'error'); }
 }
 
 function copyJobId(jobId) {
