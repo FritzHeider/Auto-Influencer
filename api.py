@@ -129,6 +129,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
+
+@app.get("/", include_in_schema=False)
+@app.get("/dashboard", include_in_schema=False)
+@app.get("/dashboard.html", include_in_schema=False)
+async def serve_dashboard():
+    if not _DASHBOARD_PATH.exists():
+        raise HTTPException(status_code=404, detail="dashboard.html not found")
+    return FileResponse(_DASHBOARD_PATH, media_type="text/html")
+
 
 class PipelineRequest(BaseModel):
     # Episode identity
